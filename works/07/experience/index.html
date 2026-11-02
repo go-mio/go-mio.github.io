@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>みお応援サイト</title>
+    <link rel="stylesheet" href="assets/main.css">
+    <link rel="stylesheet" href="assets/Arctext-master/css/style.css">
+<style>html,body{cursor:auto}.content h1{margin-top:-12vmin;margin-bottom:12vmin}</style>
+</head>
+<body>
+<main>
+    <div class="stage">
+        <!-- 背景レイヤー:星だけ -->
+        <div id="starry_sky"></div>
+
+        <!-- 前面レイヤー:メニュー -->
+        <div class="content">
+            <h1 id="arch1">みおへメッセージを届けよう！</h1>
+            <h2 id="openWriteBtn" class="menu">メッセージを書く</h2>
+            <h2 id="openPlazaBtn" class="menu">メッセージ広場へ行く</h2>
+            <h2 id="openJourneyBtn" class="menu">メッセージの旅を見る</h2>
+        </div>
+
+        <!-- 手書きオーバーレイ -->
+        <div id="writeOverlay">
+            <h2>メッセージを書く</h2>
+            <div id="penTools">
+    <span class="swatch active" data-color="#000000" style="background:#000000"></span>
+    <span class="swatch" data-color="#e0453a" style="background:#e0453a"></span>
+    <span class="swatch" data-color="#ff9f1c" style="background:#ff9f1c"></span>
+    <span class="swatch" data-color="#2fb35a" style="background:#2fb35a"></span>
+    <span class="swatch" data-color="#2f6fd0" style="background:#2f6fd0"></span>
+    <span class="swatch" data-color="#a24bd6" style="background:#a24bd6"></span>
+    <span class="swatch" data-color="#ff7eb6" style="background:#ff7eb6"></span>
+    <span class="swatch eraser" id="eraserTool">消しゴム</span>
+</div>
+            <canvas id="drawCanvasId" width="1080" height="540"></canvas>
+            <div class="buttons">
+               <!-- 手書き -->
+<button type="button" id="clearButtonId">クリア</button>
+<button type="button" id="sendButtonId">送信する</button>
+<button type="button" id="closeWriteBtn">閉じる</button>
+
+
+
+            </div>
+        </div>
+
+<!-- 打ち上げ -->
+<div id="flightOverlay">
+    <canvas id="flightCanvas" width="1000" height="1000"></canvas>
+    <div id="launchButtons">
+       <!-- 打ち上げ -->
+<button type="button" id="launchBtn">打ち上げ！</button>
+<button type="button" id="backBtn">もどる</button>
+    </div>
+</div>
+
+<!-- 説明オーバーレイ -->
+<div id="infoOverlay">
+    <h2>メッセージをありがとう！</h2>
+    <div id="infoText">
+        <!-- ここに説明文を入れてください -->
+        <h3>水星に居る「みお」にメッセージが届くまで<br><span>11分</span>かかるよ！</h3>
+        <h3 id="msg"></h3>
+    </div>
+    <!-- 説明 -->
+<button type="button" id="closeInfoBtn">もどる</button>
+</div>
+
+<!-- メッセージ広場 -->
+<div id="plazaOverlay">
+    <h2>メッセージ広場</h2>
+    <div id="plazaSky"></div>
+    <p id="plazaStatus"></p>
+    <!-- 広場 -->
+<button type="button" id="closePlazaBtn">もどる</button>
+</div>
+
+<!-- メッセージの旅 -->
+<div id="journeyOverlay">
+    <h2>メッセージの旅</h2>
+    <p id="journeyStatus"></p>
+    <svg id="journeySvg" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid meet">
+        <!-- ルート（地球→金星→水星） -->
+        <path id="journeyRoute" d="M500 780 Q380 640 500 520 Q620 400 500 260"
+              fill="none" stroke="rgba(255,240,180,0.55)" stroke-width="1.5"
+              stroke-dasharray="6 6"/>
+
+        <!-- 水星（みお） -->
+        <circle cx="500" cy="260" r="16" fill="#a39b8f"/>
+        <text x="528" y="266" class="pl-label">水星（みお）</text>
+        <!-- 金星 -->
+        <circle cx="500" cy="520" r="24" fill="#e0b060"/>
+        <text x="535" y="526" class="pl-label">金星</text>
+        <!-- 地球 -->
+        <circle cx="500" cy="780" r="36" fill="#2f6fd0"/>
+        <text x="548" y="786" class="pl-label">地球</text>
+
+        <!-- ロケットがここに入る -->
+        <g id="journeyRockets"></g>
+    </svg>
+    <!-- 旅 -->
+<button type="button" id="closeJourneyBtn">もどる</button>
+</div>
+
+        <!-- Coming Soon オーバーレイ（最前面） -->
+        <div id="overlay">
+            <p>Coming Soon</p>
+        </div>
+    </div>
+</main>
+
+
+
+
+
+
+    <script src="assets/mamhandwritten.js"></script>
+    <script src="assets/jquery-ui-1.14.2.custom/external/jquery/jquery.js"></script>
+    <script src="assets/Arctext-master/js/jquery.arctext.js"></script>
+<script>
+
+    var mamHandwritten1 = new TMamHandwritten("drawCanvasId", "clearButtonId");
+
+// ペン色・消しゴムの切り替え
+var swatches = document.querySelectorAll("#penTools .swatch");
+swatches.forEach(function (sw) {
+    sw.addEventListener("click", function () {
+        swatches.forEach(function (s) { s.classList.remove("active"); });
+        sw.classList.add("active");
+        if (sw.id === "eraserTool") {
+            mamHandwritten1.eraser = true;
+        } else {
+            mamHandwritten1.eraser = false;
+            mamHandwritten1.penColor = sw.dataset.color;
+        }
+    });
+});
+
+    var writeOverlay = document.getElementById("writeOverlay");
+    var overlay = document.getElementById("overlay");   // Coming Soon
+
+    // 「メッセージを書く」→ 手書きオーバーレイを開く
+    document.getElementById("openWriteBtn").addEventListener("click", function () {
+        writeOverlay.classList.add("show");
+    });
+
+    // 「閉じる」→ 手書きオーバーレイを閉じる（描いた内容は残ります）
+    document.getElementById("closeWriteBtn").addEventListener("click", function () {
+        writeOverlay.classList.remove("show");
+    });
+/// ===== ロケット打ち上げ =====
+var flightOverlay = document.getElementById("flightOverlay");
+var infoOverlay   = document.getElementById("infoOverlay");
+var launchBtn     = document.getElementById("launchBtn");
+var backBtn       = document.getElementById("backBtn");
+var launchButtons = document.getElementById("launchButtons");
+var fc   = document.getElementById("flightCanvas");
+var fctx = fc.getContext("2d");
+var srcCanvas = document.getElementById("drawCanvasId");
+
+var CX = 500, GROUND = 800, TWO_PI = Math.PI * 2;
+var ACCEL = 300;   // 上昇の加速度（大きいほど速い）
+
+var msgImg = null, rafId = null, infoTimer = null;
+var state = "ready";      // ready → countdown → launching
+var t0 = 0, finished = false, smoke = [];
+
+// 背景の星（固定）
+var FSTARS = [];
+for (var s = 0; s < 80; s++) {
+    FSTARS.push({ x: Math.random() * 1000, y: Math.random() * 780, r: Math.random() * 2 + 0.5 });
+}
+
+// ロケット（原点＝機体の底の中心。上が -y）
+function drawRocket(x, y, flameSize, msg) {
+    fctx.save();
+    fctx.translate(x, y);
+
+    // 炎
+    if (flameSize > 0) {
+        var fl = flameSize * (0.85 + Math.random() * 0.3);
+        var g = fctx.createLinearGradient(0, 0, 0, 220 * fl);
+        g.addColorStop(0, "#fff7c2");
+        g.addColorStop(0.35, "#ffb020");
+        g.addColorStop(1, "rgba(255,80,0,0)");
+        fctx.fillStyle = g;
+        fctx.beginPath();
+        fctx.moveTo(-45, 0);
+        fctx.quadraticCurveTo(-30, 120 * fl, 0, 220 * fl);
+        fctx.quadraticCurveTo(30, 120 * fl, 45, 0);
+        fctx.closePath();
+        fctx.fill();
+    }
+
+    // 尾翼
+    fctx.fillStyle = "#e0453a";
+    fctx.beginPath();
+    fctx.moveTo(-80, -90); fctx.lineTo(-145, 25); fctx.lineTo(-80, 0); fctx.closePath(); fctx.fill();
+    fctx.beginPath();
+    fctx.moveTo(80, -90);  fctx.lineTo(145, 25);  fctx.lineTo(80, 0);  fctx.closePath(); fctx.fill();
+
+    // 機体
+    fctx.beginPath();
+    fctx.moveTo(-80, 0);
+    fctx.lineTo(-80, -230);
+    fctx.quadraticCurveTo(-80, -340, 0, -400);
+    fctx.quadraticCurveTo(80, -340, 80, -230);
+    fctx.lineTo(80, 0);
+    fctx.closePath();
+    var bg = fctx.createLinearGradient(-80, 0, 80, 0);
+    bg.addColorStop(0, "#d8dce6"); bg.addColorStop(0.4, "#ffffff"); bg.addColorStop(1, "#b9bfce");
+    fctx.fillStyle = bg;
+    fctx.fill();
+
+    // ノーズコーン（機体の形で切り抜いて赤く）
+    fctx.save();
+    fctx.clip();
+    fctx.fillStyle = "#e0453a";
+    fctx.fillRect(-90, -420, 180, 135);
+    fctx.restore();
+
+    // 窓
+    fctx.beginPath(); fctx.arc(0, -245, 24, 0, TWO_PI);
+    fctx.fillStyle = "#5fb7ff"; fctx.fill();
+    fctx.lineWidth = 6; fctx.strokeStyle = "#8a93a8"; fctx.stroke();
+
+    // 底のノズル
+    fctx.fillStyle = "#555";
+    fctx.fillRect(-35, 0, 70, 14);
+
+    // 貼りついたメッセージ（テープ止め）
+    if (msg) {
+        var w = 140, h = 70, mx = -w / 2, my = -175;
+        fctx.save();
+        fctx.shadowColor = "rgba(0,0,0,0.35)";
+        fctx.shadowBlur = 8;
+        fctx.drawImage(msg, mx, my, w, h);
+        fctx.restore();
+        fctx.strokeStyle = "#999"; fctx.lineWidth = 1.5;
+        fctx.strokeRect(mx, my, w, h);
+        fctx.fillStyle = "rgba(255,225,100,0.85)";
+        fctx.save(); fctx.translate(mx + 4, my + 2);  fctx.rotate(-0.7); fctx.fillRect(-20, -6, 40, 12); fctx.restore();
+        fctx.save(); fctx.translate(mx + w - 4, my + 2); fctx.rotate(0.7); fctx.fillRect(-20, -6, 40, 12); fctx.restore();
+    }
+    fctx.restore();
+}
+
+function addSmoke(x, y) {
+    for (var i = 0; i < 3; i++) {
+        smoke.push({ x: x + (Math.random() - 0.5) * 60, y: y,
+                     vx: (Math.random() - 0.5) * 4, vy: Math.random() * 2,
+                     r: 15 + Math.random() * 20, life: 1 });
+    }
+}
+function drawSmoke() {
+    for (var i = smoke.length - 1; i >= 0; i--) {
+        var p = smoke[i];
+        p.x += p.vx; p.y += p.vy; p.r += 0.8; p.life -= 0.012;
+        if (p.life <= 0) { smoke.splice(i, 1); continue; }
+        fctx.beginPath(); fctx.arc(p.x, p.y, p.r, 0, TWO_PI);
+        fctx.fillStyle = "rgba(230,230,240," + (p.life * 0.5) + ")";
+        fctx.fill();
+    }
+}
+
+// 円弧に沿って文字を描く（上部アーチ）
+// text: 文字列 / cx,cy: 円の中心 / radius: 文字の基線の半径
+function drawArcText(text, cx, cy, radius, fontPx) {
+    fctx.save();
+    fctx.font = "bold " + fontPx + "px sans-serif";
+    fctx.textAlign = "center";
+    fctx.textBaseline = "alphabetic";
+
+    var chars = Array.from(text);
+    var widths = chars.map(function (ch) { return fctx.measureText(ch).width; });
+    var total = widths.reduce(function (a, b) { return a + b; }, 0);
+
+    // 真上(-90°)を中心に左右対称に並べる
+    var angle = -Math.PI / 2 - (total / radius) / 2;
+    chars.forEach(function (ch, i) {
+        var a = angle + (widths[i] / 2) / radius;   // この文字の中心角
+        fctx.save();
+        fctx.translate(cx + radius * Math.cos(a), cy + radius * Math.sin(a));
+        fctx.rotate(a + Math.PI / 2);                // 文字の上が外側を向くように
+        fctx.fillText(ch, 0, 0);
+        fctx.restore();
+        angle += widths[i] / radius;
+    });
+    fctx.restore();
+}
+
+function frame(now) {
+    var el = now - t0;
+    fctx.clearRect(0, 0, 1000, 1000);
+
+    // 星
+    fctx.fillStyle = "#fff";
+    FSTARS.forEach(function (s) {
+        fctx.globalAlpha = 0.5 + 0.5 * Math.sin(now / 400 + s.x);
+        fctx.beginPath(); fctx.arc(s.x, s.y, s.r, 0, TWO_PI); fctx.fill();
+    });
+    fctx.globalAlpha = 1;
+
+    // 地面
+    fctx.fillStyle = "#2a2f55";
+    fctx.fillRect(0, GROUND, 1000, 300);
+    fctx.fillStyle = "#3b4170";
+    fctx.fillRect(CX - 140, GROUND, 280, 14);   // 発射台
+
+    var lift = 0, flame = 0, shakeX = 0, count = null;
+
+    if (state === "countdown") {
+        if (el >= 3000) { state = "launching"; t0 = now; el = 0; }
+        else {
+            count = 3 - Math.floor(el / 1000);
+            var k = el / 3000;                       // だんだん激しく揺れる
+            shakeX = (Math.random() - 0.5) * 10 * k;
+            flame = 0.2 + 0.5 * k;
+            if (k > 0.5) addSmoke(CX, GROUND);
+        }
+    }
+    if (state === "launching") {
+        var sec = el / 1000;
+        lift = 0.5 * ACCEL * sec * sec;
+        flame = 1.2;
+        shakeX = (Math.random() - 0.5) * 6;
+        addSmoke(CX, GROUND);
+    }
+
+    drawSmoke();
+    var ry = GROUND - lift;
+    drawRocket(CX + shakeX, ry, flame, msgImg);
+
+    // 文字
+    fctx.textAlign = "center";
+    fctx.fillStyle = "#ffe9a8";
+    if (state === "ready") {
+        drawArcText("メッセージをロケットにのせたよ！", 500, 500, 370, 40);
+    } else if (count !== null) {
+        fctx.font = "bold 150px sans-serif";
+        fctx.fillText(count, CX, 260);
+    } else if (state === "launching") {
+        drawArcText("みおへ しゅっぱつ！", 500, 500, 370, 44);
+    }
+
+    // 画面外へ出たら説明へ
+    if (state === "launching" && ry < -60) { finishFlight(600); return; }
+    rafId = requestAnimationFrame(frame);
+}
+
+// 送信 → ロケット準備画面（まだ打ち上げない）
+function startFlight() {
+    msgImg = document.createElement("canvas");
+    msgImg.width = 270; msgImg.height = 135;
+    var c = msgImg.getContext("2d");
+    c.fillStyle = "#fff"; c.fillRect(0, 0, 270, 135);
+    c.drawImage(srcCanvas, 0, 0, 270, 135);
+
+    state = "ready"; finished = false; smoke = [];
+    launchButtons.style.display = "flex";
+    flightOverlay.classList.add("show");
+    t0 = performance.now();
+    cancelAnimationFrame(rafId);
+    rafId = requestAnimationFrame(frame);
+}
+
+// 打ち上げボタン
+launchBtn.addEventListener("click", function () {
+    if (state !== "ready") return;
+    saveMessage();                       // 打ち上げた時点で保存（11分カウント開始）
+    launchButtons.style.display = "none";
+    state = "countdown";
+    t0 = performance.now();
+});
+
+// もどる（まだ送っていないので手書きは残る）
+backBtn.addEventListener("click", function () {
+    if (state !== "ready") return;
+    cancelAnimationFrame(rafId);
+    flightOverlay.classList.remove("show");
+});
+
+// 打ち上げ後 → 説明オーバーレイへ
+function finishFlight(delay) {
+    if (finished) return;
+    finished = true;
+    cancelAnimationFrame(rafId);
+    infoTimer = setTimeout(function () {
+        infoOverlay.classList.add("show");
+    }, delay);
+}
+
+document.getElementById("sendButtonId").addEventListener("click", startFlight);
+
+// 打ち上げ中のタップでスキップ
+flightOverlay.addEventListener("click", function () {
+    if (state === "launching" && !finished) finishFlight(0);
+});
+
+// 説明を閉じる → 全部閉じて、手書きを白紙に戻す
+document.getElementById("closeInfoBtn").addEventListener("click", function () {
+    clearTimeout(infoTimer);
+    infoOverlay.classList.remove("show");
+    flightOverlay.classList.remove("show");
+    writeOverlay.classList.remove("show");
+    document.getElementById("clearButtonId").click();
+});
+
+// ===== 11分後=====
+const AFTER_MIN = 11;
+
+function update(){
+    const t = new Date(Date.now() + AFTER_MIN * 60 * 1000);
+    const h = t.getHours();
+    const m = t.getMinutes();
+    document.getElementById("msg").textContent =
+    `${h}時${m}分にメッセージが広場に到着するよ！`;
+}
+
+update();
+setInterval(update,1000);
+
+// ===== メッセージ広場 =====
+var STORE_KEY   = "mioMessages";
+var DELIVERY_MS = 11 * 60 * 1000;  // 届くまで11分（テスト時は 5000 などに）
+var POOL_SIZE   = 20;              // 流れ星の対象は新しい順に最大20件
+var METEOR_MS   = 9000;            // 1つの流れ星が降りる時間
+var SPAWN_MS    = 5000;            // 流れ星を出す間隔
+
+function loadMessages() {
+    try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+    catch (e) { return []; }
+}
+function storeMessages(list) {
+    // 容量オーバー時は古いものから捨てて再試行
+    while (list.length) {
+        try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); return; }
+        catch (e) { list.shift(); }
+    }
+}
+
+// 送信ボタン：手書きを縮小して保存（deliverAt＝送信の11分後）
+function saveMessage() {
+    var t = document.createElement("canvas");
+    t.width = 540; t.height = 270;
+    var c = t.getContext("2d");
+    c.fillStyle = "#fff"; c.fillRect(0, 0, 540, 270);
+    c.drawImage(srcCanvas, 0, 0, 540, 270);
+    var now = Date.now();
+    var list = loadMessages();
+    list.push({
+        id: now + "_" + Math.random().toString(36).slice(2),
+        img: t.toDataURL("image/jpeg", 0.8),
+        sentAt: now,
+        deliverAt: now + DELIVERY_MS
+    });
+    if (list.length > 60) list = list.slice(-60);
+    storeMessages(list);
+}
+
+var plazaOverlay = document.getElementById("plazaOverlay");
+var plazaSky     = document.getElementById("plazaSky");
+var plazaStatus  = document.getElementById("plazaStatus");
+var meteors = [], spawnTimer = null, plazaRaf = null, cycleShown = {};
+
+// 届いている新しい順の最大20件
+function getPool() {
+    var now = Date.now();
+    return loadMessages()
+        .filter(function (m) { return m.deliverAt <= now; })
+        .sort(function (a, b) { return b.deliverAt - a.deliverAt; })
+        .slice(0, POOL_SIZE);
+}
+
+// 新しい順に「まだ今周で流してないもの」を選ぶ。
+// 全部流し終えたらリセットしてループ。新着は先頭に割り込む。
+function pickNext(pool) {
+    var cand = pool.filter(function (m) { return !cycleShown[m.id]; });
+    if (!cand.length) { cycleShown = {}; cand = pool; }
+    var m = cand[0];
+    cycleShown[m.id] = true;
+    return m;
+}
+
+function updateStatus(poolLen) {
+    var pending = loadMessages().filter(function (m) { return m.deliverAt > Date.now(); }).length;
+    var s = "";
+    if (poolLen === 0) s = "まだ メッセージは とどいていないよ";
+    if (pending > 0)   s += (s ? "<br>" : "") + "いま " + pending + " 通が みおへの旅の途中";
+    plazaStatus.innerHTML = s;
+}
+
+function spawnMeteor() {
+    var pool = getPool();
+    updateStatus(pool.length);
+    if (!pool.length) return;
+    var msg = pickNext(pool);
+
+    var W = plazaSky.clientWidth, H = plazaSky.clientHeight;
+    var sx = W * (0.65 + Math.random() * 0.3), sy = -H * 0.1;
+    var ex = sx - W * 0.5,                      ey = H * 1.05;
+    var ang = Math.atan2(sy - ey, sx - ex) * 180 / Math.PI; // 尾は進行方向の後ろ
+
+    var el = document.createElement("div");
+    el.className = "meteor";
+    el.innerHTML = '<div class="tail"></div><div class="head"></div>' +
+                   '<div class="popup"><img alt=""></div>';
+    el.querySelector(".tail").style.transform = "translateY(-50%) rotate(" + ang + "deg)";
+    el.querySelector("img").src = msg.img;
+    plazaSky.appendChild(el);
+
+    meteors.push({ el: el, popup: el.querySelector(".popup"),
+                   start: performance.now(), sx: sx, sy: sy, ex: ex, ey: ey });
+}
+
+function plazaLoop(now) {
+    for (var i = meteors.length - 1; i >= 0; i--) {
+        var m = meteors[i];
+        var p = (now - m.start) / METEOR_MS;
+        if (p >= 1) { m.el.remove(); meteors.splice(i, 1); continue; }
+        var x = m.sx + (m.ex - m.sx) * p, y = m.sy + (m.ey - m.sy) * p;
+        m.el.style.transform = "translate(" + x + "px," + y + "px)";
+        // 画面の中ほどを通り過ぎる間だけポップアップ表示
+        m.popup.classList.toggle("show", p > 0.35 && p < 0.65);
+    }
+    plazaRaf = requestAnimationFrame(plazaLoop);
+}
+
+function openPlaza() {
+    plazaOverlay.classList.add("show");
+    cycleShown = {};
+    spawnMeteor();
+    spawnTimer = setInterval(spawnMeteor, SPAWN_MS);
+    plazaRaf = requestAnimationFrame(plazaLoop);
+}
+function closePlaza() {
+    plazaOverlay.classList.remove("show");
+    clearInterval(spawnTimer);
+    cancelAnimationFrame(plazaRaf);
+    meteors.forEach(function (m) { m.el.remove(); });
+    meteors = [];
+}
+document.getElementById("openPlazaBtn").addEventListener("click", openPlaza);
+document.getElementById("closePlazaBtn").addEventListener("click", closePlaza);
+
+// ===== メッセージの旅 =====
+var journeyOverlay = document.getElementById("journeyOverlay");
+var journeyStatus  = document.getElementById("journeyStatus");
+var journeyRoute   = document.getElementById("journeyRoute");
+var journeyRockets = document.getElementById("journeyRockets");
+var journeyEls = {}, journeyTimer = null, journeyRaf = null;
+var routeLen = 0;
+
+var SVG_NS = "http://www.w3.org/2000/svg";
+
+// 小さなロケット（先端が上＝-y。原点は機体の中心）
+function makeRocketEl() {
+    var g = document.createElementNS(SVG_NS, "g");
+    g.innerHTML =
+        '<path d="M0 -16 Q7 -6 7 8 L-7 8 Q-7 -6 0 -16Z" fill="#fff"/>' +
+        '<path d="M0 -16 Q4 -11 5 -7 L-5 -7 Q-4 -11 0 -16Z" fill="#e0453a"/>' +
+        '<path d="M-7 2 L-13 12 L-7 8Z M7 2 L13 12 L7 8Z" fill="#e0453a"/>' +
+        '<circle cx="0" cy="-1" r="2.5" fill="#5fb7ff"/>' +
+        '<path d="M-4 8 Q0 20 4 8Z" fill="#ffb020"/>';
+    return g;
+}
+
+// 進行度 p(0〜1) → ルート上の座標と進行方向
+function pointOnRoute(p) {
+    var d = routeLen * p;
+    var a = journeyRoute.getPointAtLength(d);
+    var b = journeyRoute.getPointAtLength(Math.min(routeLen, d + 1));
+    var c = journeyRoute.getPointAtLength(Math.max(0, d - 1));
+    var ang = Math.atan2(b.y - c.y, b.x - c.x) * 180 / Math.PI + 90; // 先端を進行方向へ
+    return { x: a.x, y: a.y, ang: ang };
+}
+
+// 毎フレーム位置を更新（なめらかに動く）
+function journeyFrame() {
+    var now = Date.now();
+    Object.keys(journeyEls).forEach(function (id) {
+        var o = journeyEls[id];
+        var p = (now - o.sentAt) / (o.deliverAt - o.sentAt);
+        if (p >= 1) { o.el.remove(); delete journeyEls[id]; return; }
+        p = Math.max(0, p);
+        var pt = pointOnRoute(p);
+        o.el.setAttribute("transform",
+            "translate(" + pt.x + "," + pt.y + ") rotate(" + pt.ang + ") scale(1.2)");
+    });
+    journeyRaf = requestAnimationFrame(journeyFrame);
+}
+
+// 1秒ごとに「旅の途中の一覧」を同期（追加・削除・件数）
+function syncJourney() {
+    var now = Date.now();
+    var list = loadMessages().filter(function (m) { return m.deliverAt > now; });
+    var alive = {};
+
+    list.forEach(function (m) {
+        alive[m.id] = true;
+        if (!journeyEls[m.id]) {
+            var el = makeRocketEl();
+            journeyRockets.appendChild(el);
+            journeyEls[m.id] = { el: el, sentAt: m.sentAt, deliverAt: m.deliverAt };
+        }
+    });
+    Object.keys(journeyEls).forEach(function (id) {
+        if (!alive[id]) { journeyEls[id].el.remove(); delete journeyEls[id]; }
+    });
+
+    journeyStatus.textContent = list.length
+        ? "いま " + list.length + " 通が みおへの旅の途中"
+        : "いま 旅の途中のメッセージは ないよ";
+}
+
+function openJourney() {
+    journeyOverlay.classList.add("show");
+    routeLen = journeyRoute.getTotalLength();
+    syncJourney();
+    journeyTimer = setInterval(syncJourney, 1000);
+    journeyRaf = requestAnimationFrame(journeyFrame);
+}
+function closeJourney() {
+    journeyOverlay.classList.remove("show");
+    clearInterval(journeyTimer);
+    cancelAnimationFrame(journeyRaf);
+    Object.keys(journeyEls).forEach(function (id) { journeyEls[id].el.remove(); });
+    journeyEls = {};
+}
+document.getElementById("openJourneyBtn").addEventListener("click", openJourney);
+document.getElementById("closeJourneyBtn").addEventListener("click", closeJourney);
+
+// アーチ文字：画面サイズに合わせて作り直す
+function applyArch() {
+    var $h = $('#arch1');
+    try { $h.arctext('destroy'); } catch (e) {}        // 元の文字に戻す
+    var vmin = Math.min(window.innerWidth, window.innerHeight);
+    $h.arctext({ radius: vmin * 0.54 });               // 以前の540px相当を画面比に
+}
+
+// フォント確定後に実行 + リサイズ時に再計算
+if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(applyArch);
+} else {
+    window.addEventListener("load", applyArch);
+}
+var archTimer = null;
+window.addEventListener("resize", function () {
+    clearTimeout(archTimer);
+    archTimer = setTimeout(applyArch, 150);
+});
+    //-------------------------------------------------------------------- 星空
+    var sky = document.getElementById("starry_sky");
+    for (var i = 0; i < 300; i++) {
+        var star = document.createElement("div");
+        star.classList.add("star");
+        var d = Math.random() * 3 + 1;
+        star.style.width = d + "px";
+        star.style.height = d + "px";
+        star.style.top = Math.random() * 100 + "%";
+        star.style.left = Math.random() * 100 + "%";
+        star.style.animationDuration = (Math.random() * 2 + 1.5) + "s";
+        sky.appendChild(star);
+    }
+</script>
+    </body>
+</html>

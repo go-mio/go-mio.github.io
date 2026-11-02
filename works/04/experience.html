@@ -1,0 +1,668 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>MIO Mission - Fullscreen Simulation Experience</title>
+  <style>
+    :root { box-sizing: border-box; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: radial-gradient(circle at 50% 50%, #10101c 0%, #05050a 100%);
+      color: #ffffff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      font-family: 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', 'Yu Gothic', 'YuGothic', 'Meiryo', 'Noto Sans JP', sans-serif;
+    }
+
+    #circular-display {
+      width: 100vmin;
+      height: 100vmin;
+      max-width: 1080px;
+      max-height: 1080px;
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(180, 220, 255, 0.18), 0 0 64px rgba(0, 150, 255, 0.28);
+      background: #000;
+      cursor: pointer;
+    }
+
+    #sim-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding-bottom: 13%;
+      box-sizing: border-box;
+      opacity: 0;
+      transition: opacity 0.8s ease;
+      z-index: 20;
+      background:
+        radial-gradient(circle, transparent 52%, rgba(0, 0, 0, 0.8) 100%),
+        linear-gradient(to top, rgba(2, 4, 12, 0.82) 0%, rgba(2, 4, 12, 0.35) 32%, transparent 55%);
+    }
+    #sim-overlay.active { opacity: 1; }
+
+    .sim-caption-box {
+      text-align: center;
+      width: 68%;
+      transform: translateY(1.4vmin);
+      transition: transform 1s cubic-bezier(0.22, 0.8, 0.2, 1);
+    }
+    #sim-overlay.active .sim-caption-box { transform: translateY(0); }
+
+    .sim-title {
+      font-size: 3.1vmin;
+      font-weight: 500;
+      color: #e9f6ff;
+      letter-spacing: 0.14em;
+      text-indent: 0.14em;
+      line-height: 1.5;
+      text-shadow: 0 0 18px rgba(120, 210, 255, 0.45);
+    }
+
+    .sim-rule {
+      width: 9vmin;
+      height: 1px;
+      margin: 1.6vmin auto 1.7vmin;
+      background: linear-gradient(90deg, transparent, rgba(136, 229, 255, 0.9), transparent);
+    }
+
+    .sim-desc {
+      font-size: 2.1vmin;
+      font-weight: 400;
+      color: rgba(240, 247, 255, 0.95);
+      letter-spacing: 0.05em;
+      line-height: 1.85;
+      text-wrap: balance;
+      text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95);
+    }
+
+    .progress-container {
+      position: absolute;
+      top: 9%;
+      width: 30%;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.16);
+      overflow: visible;
+    }
+    .progress-bar {
+      width: 0%;
+      height: 100%;
+      background: #9aeeff;
+      box-shadow: 0 0 8px rgba(0, 240, 255, 0.9);
+      transition: width 0.1s linear;
+    }
+
+    .thermal-label {
+      position: absolute;
+      top: 46%;
+      transform: translateY(-50%);
+      text-align: center;
+      line-height: 1.3;
+      opacity: 0;
+      transition: opacity 0.6s ease 0.2s;
+    }
+    #sim-overlay[data-mode="thermal"].active .thermal-label { opacity: 1; }
+    .thermal-label b { display: block; font-size: 3.4vmin; font-weight: 600; letter-spacing: 0.04em; }
+    .thermal-label span { display: block; font-size: 1.9vmin; letter-spacing: 0.25em; margin-top: 0.4vmin; opacity: 0.85; }
+    .thermal-label.day { right: 9%; color: #ffc489; text-shadow: 0 0 14px rgba(255, 140, 50, 0.6); }
+    .thermal-label.night { left: 9%; color: #9ed4ff; text-shadow: 0 0 14px rgba(60, 150, 255, 0.6); }
+  </style>
+</head>
+<body>
+
+  <div id="circular-display">
+    <div id="sim-overlay">
+      <div class="progress-container">
+        <div id="progress-bar" class="progress-bar"></div>
+      </div>
+
+      <div class="thermal-label day"><b>430℃超</b><span>昼側</span></div>
+      <div class="thermal-label night"><b>−180℃</b><span>夜側</span></div>
+
+      <div class="sim-caption-box">
+        <div id="sim-title" class="sim-title">TITLE</div>
+        <div class="sim-rule"></div>
+        <div id="sim-desc" class="sim-desc">説明文がここに表示されます</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script>
+    const container = document.getElementById('circular-display');
+    const simOverlay = document.getElementById('sim-overlay');
+    const simTitle = document.getElementById('sim-title');
+    const simDesc = document.getElementById('sim-desc');
+    const progressBar = document.getElementById('progress-bar');
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    camera.position.z = 33.5;
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(container.clientWidth, container.clientHeight);
+    container.appendChild(renderer.domElement);
+
+    function onResize() {
+      const size = Math.min(container.clientWidth, container.clientHeight);
+      renderer.setSize(size, size);
+      camera.aspect = 1;
+      camera.updateProjectionMatrix();
+    }
+    window.addEventListener('resize', onResize);
+
+    // --- ライティング ---
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9));
+
+    const dirLight = new THREE.DirectionalLight(0xfff0dd, 1.3);
+    dirLight.position.set(15, 5, 10);
+    scene.add(dirLight);
+
+    const pointLight = new THREE.PointLight(0x4090ff, 0.4, 180);
+    pointLight.position.set(-9, -7.2, 9);
+    scene.add(pointLight);
+
+    // 宇宙の星々
+    const starsCount = 1000;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(starsCount * 3);
+    for (let i = 0; i < starsCount * 3; i += 3) {
+      starPos[i] = (Math.random() - 0.5) * 60;
+      starPos[i + 1] = (Math.random() - 0.5) * 60;
+      starPos[i + 2] = (Math.random() - 0.5) * 36 - 9;
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 0.09, transparent: true, opacity: 0 });
+    scene.add(new THREE.Points(starGeo, starMat));
+
+    // --- 水星テクスチャ ---
+    function createMercuryTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024; canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = 1024; bumpCanvas.height = 512;
+      const bumpCtx = bumpCanvas.getContext('2d');
+
+      ctx.fillStyle = '#83868c';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      bumpCtx.fillStyle = '#808080';
+      bumpCtx.fillRect(0, 0, bumpCanvas.width, bumpCanvas.height);
+
+      ctx.filter = 'blur(1.8px)';
+      bumpCtx.filter = 'blur(2.2px)';
+
+      for (let i = 0; i < 260; i++) {
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * (canvas.height * 0.8) + canvas.height * 0.1;
+        const radius = Math.random() * 30 + 6;
+
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = Math.random() > 0.4 ? 'rgba(230, 235, 240, 0.09)' : 'rgba(35, 38, 45, 0.11)';
+        ctx.fill();
+
+        bumpCtx.beginPath();
+        bumpCtx.arc(x, y, radius * 0.85, 0, Math.PI * 2);
+        bumpCtx.fillStyle = 'rgba(20, 20, 20, 0.25)';
+        bumpCtx.fill();
+
+        bumpCtx.beginPath();
+        bumpCtx.arc(x, y, radius, 0, Math.PI * 2);
+        bumpCtx.strokeStyle = 'rgba(240, 240, 240, 0.22)';
+        bumpCtx.lineWidth = 1.8;
+        bumpCtx.stroke();
+      }
+
+      ctx.filter = 'none';
+      bumpCtx.filter = 'none';
+
+      return { map: new THREE.CanvasTexture(canvas), bumpMap: new THREE.CanvasTexture(bumpCanvas) };
+    }
+
+    const mercuryTextures = createMercuryTexture();
+
+    const mioGeometry = new THREE.SphereGeometry(1.32, 64, 64);
+    const mioMaterial = new THREE.MeshStandardMaterial({
+      color: 0xaeb0b7,
+      emissive: 0x000000,
+      map: mercuryTextures.map,
+      bumpMap: mercuryTextures.bumpMap,
+      bumpScale: 0.035,
+      roughness: 0.82,
+      metalness: 0.05
+    });
+    const mioMesh = new THREE.Mesh(mioGeometry, mioMaterial);
+    mioMesh.scale.setScalar(1.15);
+    scene.add(mioMesh);
+
+    // 水星の周囲にやわらかい光のにじみ（背景が明るい時期でも輪郭が立つように）
+    const glowCanvas = document.createElement('canvas');
+    glowCanvas.width = 256; glowCanvas.height = 256;
+    const gctx = glowCanvas.getContext('2d');
+    const grad = gctx.createRadialGradient(128, 128, 40, 128, 128, 128);
+    grad.addColorStop(0, 'rgba(255, 255, 255, 0.12)');
+    grad.addColorStop(0.5, 'rgba(190, 225, 255, 0.04)');
+    grad.addColorStop(1, 'rgba(190, 225, 255, 0)');
+    gctx.fillStyle = grad;
+    gctx.fillRect(0, 0, 256, 256);
+    const glowSprite = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: new THREE.CanvasTexture(glowCanvas), transparent: true, depthWrite: false
+    }));
+    glowSprite.scale.set(6.5, 6.5, 1);
+    glowSprite.position.z = -0.3;
+    scene.add(glowSprite);
+
+    // 水星の上に重ねる赤い半透明の核
+    const coreOverlayGeo = new THREE.SphereGeometry(0.99, 64, 64);
+    const coreOverlayMat = new THREE.MeshBasicMaterial({ color: 0xff1100, transparent: true, opacity: 0, depthTest: false });
+    const coreOverlayMesh = new THREE.Mesh(coreOverlayGeo, coreOverlayMat);
+    coreOverlayMesh.renderOrder = 10;
+    coreOverlayMesh.scale.setScalar(1.15);
+    scene.add(coreOverlayMesh);
+
+    // --- 探査機「みお」モデル ---
+    function createMioCraft() {
+      const group = new THREE.Group();
+
+      const octShape = new THREE.Shape();
+      const sides = 8;
+      const radius = 0.45;
+      for (let i = 0; i < sides; i++) {
+        const a = (i / sides) * Math.PI * 2;
+        const x = Math.cos(a) * radius;
+        const y = Math.sin(a) * radius;
+        if (i === 0) octShape.moveTo(x, y);
+        else octShape.lineTo(x, y);
+      }
+      octShape.closePath();
+
+      const octGeo = new THREE.ExtrudeGeometry(octShape, { depth: 0.45, bevelEnabled: false });
+      const octMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.95, roughness: 0.15 });
+      const bodyMesh = new THREE.Mesh(octGeo, octMat);
+      bodyMesh.rotation.x = Math.PI / 2;
+      bodyMesh.position.y = 0.225;
+      group.add(bodyMesh);
+
+      const antennaGeo = new THREE.ConeGeometry(0.28, 0.2, 16);
+      const antennaMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.5, roughness: 0.3 });
+      const antennaMesh = new THREE.Mesh(antennaGeo, antennaMat);
+      antennaMesh.position.y = 0.32;
+      group.add(antennaMesh);
+
+      const wireMat = new THREE.LineBasicMaterial({ color: 0x00f0ff });
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2;
+        const points = [
+          new THREE.Vector3(0, 0, 0),
+          new THREE.Vector3(Math.cos(a) * 1.8, 0, Math.sin(a) * 1.8)
+        ];
+        group.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), wireMat));
+      }
+
+      return group;
+    }
+
+    const mioCraft = createMioCraft();
+
+    const boatGeo = new THREE.ConeGeometry(0.54, 1.44, 3);
+    const boatMat = new THREE.MeshBasicMaterial({ color: 0x005577, transparent: true, opacity: 1 });
+    const boatMesh = new THREE.Mesh(boatGeo, boatMat);
+    boatMesh.rotation.x = Math.PI / 2;
+
+    const shipGeo = new THREE.BoxGeometry(0.9, 0.54, 1.8);
+    const shipMat = new THREE.MeshBasicMaterial({ color: 0x1133aa, transparent: true, opacity: 0 });
+    const shipMesh = new THREE.Mesh(shipGeo, shipMat);
+
+    const travelerGroup = new THREE.Group();
+    travelerGroup.add(boatMesh);
+    travelerGroup.add(shipMesh);
+    travelerGroup.add(mioCraft);
+    scene.add(travelerGroup);
+
+    // 軌跡ライン
+    const MAX_TRAIL_POINTS = 8000;
+    const trailPositions = new Float32Array(MAX_TRAIL_POINTS * 3);
+    const trailGeo = new THREE.BufferGeometry();
+    trailGeo.setAttribute('position', new THREE.BufferAttribute(trailPositions, 3));
+    const trailMat = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.8, linewidth: 3.6 });
+    scene.add(new THREE.Line(trailGeo, trailMat));
+    let trailCount = 0;
+
+    // シミュレーション描画用グループ
+    const simGroup = new THREE.Group();
+    scene.add(simGroup);
+
+    const filterGeo = new THREE.SphereGeometry(1.48, 32, 32);
+    const hotFilterMat = new THREE.MeshBasicMaterial({ color: 0xff6600, wireframe: true, transparent: true, opacity: 0 });
+    const coldFilterMat = new THREE.MeshBasicMaterial({ color: 0x00bfff, wireframe: true, transparent: true, opacity: 0 });
+    const hotFilterMesh = new THREE.Mesh(filterGeo, hotFilterMat);
+    const coldFilterMesh = new THREE.Mesh(filterGeo, coldFilterMat);
+    hotFilterMesh.scale.setScalar(1.15);
+    coldFilterMesh.scale.setScalar(1.15);
+    simGroup.add(hotFilterMesh);
+    simGroup.add(coldFilterMesh);
+
+    // 寒暖差シミュレーション：太陽側を熱色、影側を寒色で彩り、境目をなめらかにつなぐ
+    const thermalMat = new THREE.ShaderMaterial({
+      uniforms: { uOpacity: { value: 0 }, uSun: { value: new THREE.Vector3(1, 0, 0.12).normalize() } },
+      transparent: true,
+      depthWrite: false,
+      vertexShader: 'varying vec3 vN; void main(){ vN = normalize(mat3(modelMatrix) * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform float uOpacity; uniform vec3 uSun; varying vec3 vN; void main(){ float d = dot(normalize(vN), normalize(uSun)); float t = smoothstep(-0.2, 0.2, d); vec3 hot = mix(vec3(1.0, 0.38, 0.06), vec3(1.0, 0.82, 0.42), smoothstep(0.4, 1.0, d)); vec3 cold = mix(vec3(0.18, 0.55, 1.0), vec3(0.04, 0.14, 0.55), smoothstep(0.2, 1.0, -d)); gl_FragColor = vec4(mix(cold, hot, t), 0.72 * uOpacity); }'
+    });
+    simGroup.add(new THREE.Mesh(new THREE.SphereGeometry(1.54, 64, 64), thermalMat));
+
+    // 右側から差す太陽の光
+    const sunCanvas = document.createElement('canvas');
+    sunCanvas.width = 256; sunCanvas.height = 256;
+    const sctx = sunCanvas.getContext('2d');
+    const sgrad = sctx.createRadialGradient(128, 128, 0, 128, 128, 128);
+    sgrad.addColorStop(0, 'rgba(255, 210, 130, 0.95)');
+    sgrad.addColorStop(0.35, 'rgba(255, 140, 40, 0.35)');
+    sgrad.addColorStop(1, 'rgba(255, 120, 20, 0)');
+    sctx.fillStyle = sgrad; sctx.fillRect(0, 0, 256, 256);
+    const sunGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(sunCanvas), transparent: true, opacity: 0, depthWrite: false }));
+    sunGlow.scale.set(7, 7, 1);
+    sunGlow.position.set(7.4, 0.2, -0.5);
+    simGroup.add(sunGlow);
+
+    const spinRingGeo = new THREE.RingGeometry(1.4, 1.45, 64);
+    const spinRingMat = new THREE.MeshBasicMaterial({ color: 0xff007f, side: THREE.DoubleSide, transparent: true, opacity: 0 });
+    const spinRingMesh = new THREE.Mesh(spinRingGeo, spinRingMat);
+    simGroup.add(spinRingMesh);
+
+    // --- 渦巻き軌道：幅を狭く・巻き数を増やす（機体の角速度は従来どおり 0.012/フレーム） ---
+    let angle = 0;
+    const ANGLE_STEP = 0.012;
+    // 円に近い渦巻き軌道に、周期的な揺らぎを重ねて複雑な軌道にする
+    const WOBBLE_FREQ = 1.5;   // 1周あたりの揺らぎ回数（1.5で、2周で一度重なるローゼット状）
+    const INITIAL_RADIUS = 15.5;           // 円形画面（視界の半径は約13.9）の外から始まる
+    const TARGET_RADIUS = 3.96;
+    const TOTAL_ANGLE = Math.PI * 2 * 3; // 3周で収束
+
+    const colorRiver = new THREE.Color(0x86f0ff);
+    const colorSea   = new THREE.Color(0x4b97DD);
+    const colorSpace = new THREE.Color(0x020208);
+    scene.background = colorRiver.clone();
+
+    function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+    // 背景・機体の切り替えは渦の進行度（0〜1）で管理
+    const F1 = 0.14, F2 = 0.40, F3 = 0.42, F4 = 0.80;
+
+    const clock = new THREE.Clock();
+
+    const pointGeo = new THREE.CircleGeometry(0.5, 48);
+    const ringGeo = new THREE.RingGeometry(0.66, 0.71, 64);
+    const rippleGeo = new THREE.RingGeometry(0.9, 0.94, 64);
+    // 再生アイコン（▶）
+    const playShape = new THREE.Shape();
+    playShape.moveTo(-0.12, -0.2);
+    playShape.lineTo(0.22, 0);
+    playShape.lineTo(-0.12, 0.2);
+    playShape.closePath();
+    const playGeo = new THREE.ShapeGeometry(playShape);
+    const hitAreaGeo = new THREE.SphereGeometry(1.4, 16, 16);
+
+    const pointsData = [
+      {
+        id: 'blue',
+        color: 0x9FB5DE,
+        triggerAngle: Math.PI * 1.8,
+        simMode: 'core',
+        title: '水星の巨大な核（コア）構造',
+        desc: '水星の半径の約85パーセントを占める巨大な金属核。内部に豊かな鉄成分を保持している特殊な地球型惑星'
+      },
+      {
+        id: 'pink',
+        color: 0xDE9FD4,
+        triggerAngle: Math.PI * 3.6,
+        simMode: 'thermal',
+        title: '激しい昼夜の寒暖差環境',
+        desc: '昼夜の温度差は600度以上。太陽光が当たる面は430度超の灼熱、影となる面はマイナス180度の極寒となる過酷な環境'
+      },
+      {
+        id: 'purple',
+        color: 0x9978AC,
+        triggerAngle: Math.PI * 5.4,
+        simMode: 'spin',
+        title: 'みおの自転スピン周回観測',
+        desc: '約4秒に1回転のスピードでスピンしながら水星を周回'
+      }
+    ];
+
+    const clickablePoints = [];
+
+    pointsData.forEach((pd) => {
+      const mat = new THREE.MeshBasicMaterial({ color: pd.color, transparent: true, opacity: 0 });
+      const mesh = new THREE.Mesh(pointGeo, mat);
+
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitMesh = new THREE.Mesh(hitAreaGeo, hitMat);
+
+      const group = new THREE.Group();
+      const ring = new THREE.Mesh(ringGeo, new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, transparent: true, opacity: 0 }));
+      const ripple = new THREE.Mesh(rippleGeo, new THREE.MeshBasicMaterial({ color: pd.color, side: THREE.DoubleSide, transparent: true, opacity: 0 }));
+      const play = new THREE.Mesh(playGeo, new THREE.MeshBasicMaterial({ color: 0x0b1330, side: THREE.DoubleSide, transparent: true, opacity: 0 }));
+      ring.position.z = 0.01;
+      ripple.position.z = 0.01;
+      play.position.z = 0.03;
+      group.add(mesh);
+      group.add(ring);
+      group.add(ripple);
+      group.add(play);
+      group.add(hitMesh);
+      scene.add(group);
+
+      clickablePoints.push({
+        id: pd.id, group, mesh, ring, ripple, play, hitMesh,
+        triggerAngle: pd.triggerAngle, simMode: pd.simMode, title: pd.title, desc: pd.desc,
+        isTriggered: false
+      });
+    });
+
+    let isPlayingVideo = false;
+    let videoStartTime = 0;
+    const VIDEO_DURATION = 6.0;
+    let activeSimMode = null;
+
+    function startSimulationVideo(simMode, title, desc) {
+      isPlayingVideo = true;
+      videoStartTime = clock.getElapsedTime();
+      activeSimMode = simMode;
+
+      simTitle.innerText = title;
+      simDesc.innerText = desc;
+      simOverlay.dataset.mode = simMode;
+      simOverlay.classList.add('active');
+    }
+
+    function stopSimulationVideo() {
+      isPlayingVideo = false;
+      activeSimMode = null;
+      simOverlay.classList.remove('active');
+
+      coreOverlayMat.opacity = 0;
+      mioMaterial.transparent = false;
+      mioMaterial.opacity = 1.0;
+
+      camera.position.set(0, 0, 33.5);
+      camera.lookAt(0, 0, 0);
+    }
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    function updateMousePos(e) {
+      const rect = container.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    }
+
+    container.addEventListener('click', (e) => {
+      if (isPlayingVideo) {
+        stopSimulationVideo();
+        return;
+      }
+
+      updateMousePos(e);
+      raycaster.setFromCamera(mouse, camera);
+
+      const activePoints = clickablePoints.filter(p => p.isTriggered);
+      const pointIntersects = raycaster.intersectObjects(activePoints.map(p => p.hitMesh));
+
+      if (pointIntersects.length > 0) {
+        const hitMesh = pointIntersects[0].object;
+        const matchedPoint = activePoints.find(p => p.hitMesh === hitMesh);
+        if (matchedPoint) {
+          startSimulationVideo(matchedPoint.simMode, matchedPoint.title, matchedPoint.desc);
+        }
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const elapsedTime = clock.getElapsedTime();
+
+      // 渦巻きの進行度
+      const s = Math.min(angle / TOTAL_ANGLE, 1.0);
+
+      if (s < F1) {
+        scene.background.copy(colorRiver);
+        boatMat.opacity = 1; shipMat.opacity = 0; mioCraft.visible = false; starMat.opacity = 0;
+      } else if (s < F2) {
+        const p = easeOutCubic((s - F1) / (F2 - F1));
+        scene.background.lerpColors(colorRiver, colorSea, p);
+        boatMat.opacity = 1 - p; shipMat.opacity = p; mioCraft.visible = false; starMat.opacity = 0;
+      } else if (s < F3) {
+        scene.background.copy(colorSea);
+        boatMat.opacity = 0; shipMat.opacity = 1; mioCraft.visible = false; starMat.opacity = 0;
+      } else if (s < F4) {
+        const p = easeOutCubic((s - F3) / (F4 - F3));
+        scene.background.lerpColors(colorSea, colorSpace, p);
+        boatMat.opacity = 0; shipMat.opacity = 1 - p; mioCraft.visible = true; starMat.opacity = p;
+      } else {
+        scene.background.copy(colorSpace);
+        boatMat.opacity = 0; shipMat.opacity = 0; mioCraft.visible = true; starMat.opacity = 1;
+      }
+
+      // 基本は円に近い渦巻き。そこにゆっくりとした揺らぎと、比較的大きい長周期のうねりを重ねる
+      const baseRadius = TARGET_RADIUS + (INITIAL_RADIUS - TARGET_RADIUS) * Math.pow(1 - s, 1.25);
+      // 揺らぎの振幅：途中で最大（約9%）、開始・終盤は控えめ
+      const amp = 0.03 + 0.07 * Math.pow(Math.sin(Math.PI * s), 0.8);
+      const wobble = 1
+        + amp * Math.sin(WOBBLE_FREQ * angle + 0.6)
+        + 0.025 * Math.sin(0.5 * angle + 1.2);
+      const currentRadius = baseRadius * wobble;
+
+      angle += ANGLE_STEP;
+      const posX = Math.cos(angle) * currentRadius;
+      const posY = Math.sin(angle) * currentRadius;
+
+      travelerGroup.position.x = posX;
+      travelerGroup.position.y = posY;
+
+      if (!isPlayingVideo || activeSimMode !== 'spin') {
+        travelerGroup.rotation.z = angle + Math.PI / 2;
+        mioCraft.rotation.z += 0.01;
+      }
+
+      clickablePoints.forEach((p) => {
+        if (!p.isTriggered && angle >= p.triggerAngle) {
+          p.isTriggered = true;
+          p.group.position.set(posX, posY, 0.01);
+        }
+
+        if (p.isTriggered) {
+          if (p.mesh.material.opacity < 0.92) p.mesh.material.opacity += 0.03;
+          const scale = 1 + Math.sin(elapsedTime * 3 + p.triggerAngle) * 0.05;
+          p.mesh.scale.set(scale, scale, 1);
+          const fade = Math.min(p.mesh.material.opacity / 0.92, 1);
+          p.ring.material.opacity = 0.9 * fade;
+          p.play.material.opacity = fade;
+          // 外側へ広がって消える波紋（クリックできることの合図）
+          const ph = (elapsedTime * 0.6 + p.triggerAngle) % 1;
+          const rs = 1 + ph * 0.8;
+          p.ripple.scale.set(rs, rs, 1);
+          p.ripple.material.opacity = (1 - ph) * 0.55 * fade;
+        }
+      });
+
+      if (trailCount < MAX_TRAIL_POINTS) {
+        const positions = trailGeo.attributes.position.array;
+        positions[trailCount * 3]     = posX;
+        positions[trailCount * 3 + 1] = posY;
+        positions[trailCount * 3 + 2] = 0;
+
+        trailCount++;
+        trailGeo.setDrawRange(0, trailCount);
+        trailGeo.attributes.position.needsUpdate = true;
+      }
+
+      mioMesh.rotation.y += 0.003;
+
+      if (isPlayingVideo) {
+        const videoProgress = (elapsedTime - videoStartTime) / VIDEO_DURATION;
+        progressBar.style.width = Math.min(videoProgress * 100, 100) + '%';
+
+        if (activeSimMode === 'core') {
+          camera.position.z = 18.0;
+          mioMaterial.transparent = true;
+          mioMaterial.opacity = 0.55;
+          coreOverlayMat.opacity = 0.65 + Math.sin(elapsedTime * 4) * 0.15;
+
+        } else if (activeSimMode === 'thermal') {
+          camera.position.z = 18.0;
+          const fadeIn = Math.min((elapsedTime - videoStartTime) / 0.8, 1);
+          thermalMat.uniforms.uOpacity.value = fadeIn;
+          sunGlow.material.opacity = 0.55 * fadeIn;
+
+        } else if (activeSimMode === 'spin') {
+          camera.position.set(posX, posY, 8.0);
+          camera.lookAt(posX, posY, 0);
+
+          // 4秒で1回転 (15 rpm)
+          mioCraft.rotation.z += (Math.PI / 2) * delta;
+
+          spinRingMesh.position.set(posX, posY, 0);
+          spinRingMat.opacity = 0.85 * (1 - (videoProgress % 0.33) / 0.33);
+          const sc = 0.5 + ((videoProgress % 0.33) / 0.33) * 4.0;
+          spinRingMesh.scale.set(sc, sc, 1);
+        }
+
+        if (videoProgress >= 1.0) {
+          stopSimulationVideo();
+        }
+      } else {
+        coreOverlayMat.opacity = Math.max(coreOverlayMat.opacity - 0.05, 0);
+        hotFilterMat.opacity = Math.max(hotFilterMat.opacity - 0.05, 0);
+        coldFilterMat.opacity = Math.max(coldFilterMat.opacity - 0.05, 0);
+        spinRingMat.opacity = Math.max(spinRingMat.opacity - 0.05, 0);
+        thermalMat.uniforms.uOpacity.value = Math.max(thermalMat.uniforms.uOpacity.value - 0.05, 0);
+        sunGlow.material.opacity = Math.max(sunGlow.material.opacity - 0.05, 0);
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+    // 8分ごとにページを自動でリロード
+    setTimeout(() => { location.reload(); }, 8 * 60 * 1000);
+  </script>
+</body>
+</html>

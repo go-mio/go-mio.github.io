@@ -1,0 +1,500 @@
+* {
+    margin: 0;
+    padding: 0;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+    cursor: none;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: none;
+}
+
+main {
+    width: 100%;
+    height: 100%;
+}
+
+.stage {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 100vmin;
+    height: 100vmin;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(0deg, #ccae9f 0%, #28305d 40%, #050847 80%) no-repeat #383d95;
+}
+
+/* 背景レイヤー:stage全体に敷く */
+#starry_sky {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;   /* 星がクリック・タッチを邪魔しない */
+}
+
+.star {
+    position: absolute;     /* ← relative から absolute に変更 */
+    background-color: white;
+    border-radius: 50%;
+    animation-name: twinkle;
+    animation-iteration-count: infinite;
+}
+
+@keyframes twinkle {
+    50% { transform: scale(0.2); }
+}
+
+/* 前面レイヤー:ここで中央揃え */
+.content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2vmin;
+    box-sizing: border-box;
+}
+
+.content h1 {
+    font-size: 6vmin;
+    color: #fff;
+    text-align: center;
+    margin-top: -200px;
+    margin-bottom: 200px;
+}
+
+.content h2 {
+    font-size: 3.5vmin;
+    color: #fff;
+}
+
+#drawCanvasId {
+    width: 75vmin;
+    height: 37.5vmin;
+    background: #fff;
+    border: 1px solid #000;
+    touch-action: none;
+}
+
+.buttons {
+    display: flex;
+    gap: 3vmin;
+}
+
+
+
+/* オーバーレイ:stageいっぱいに白く覆う */
+#overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* 非表示時 */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+}
+
+#overlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+
+#overlay p {
+    font-size: 8vmin;
+    color: #28305d;
+    letter-spacing: 0.1em;
+}
+
+.content h2.menu {
+    cursor: pointer;
+    padding: 1vmin 3vmin;
+    border-radius: 999px;
+    transition: background 0.2s;
+}
+.content h2.menu:hover,
+.content h2.menu:active {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 手書きオーバーレイ */
+#writeOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 5;                      /* Coming Soon(10) より下 */
+    background: rgba(5, 8, 71, 0.92);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2vmin;
+
+    /* 非表示時（display:noneにしない：canvasのサイズ計算を保つため） */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+}
+#writeOverlay.show {
+    opacity: 1;
+    visibility: visible;
+}
+#writeOverlay h2 {
+    font-size: 3.5vmin;
+    color: #fff;
+}
+
+
+/* 飛行アニメーション */
+#flightOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 8;
+    background: rgba(2, 4, 30, 0.96);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s ease, visibility 0.4s;
+}
+#flightOverlay.show { opacity: 1; visibility: visible; }
+#flightCanvas { width: 100%; height: 100%; display: block; }
+#launchButtons {
+    position: absolute;
+    bottom: 9vmin;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    gap: 3vmin;
+}
+
+/* 説明オーバーレイ */
+#infoOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 9;
+    background: rgba(5, 8, 71, 0.95);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3vmin;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.6s ease, visibility 0.6s;
+}
+
+#infoOverlay.show { 
+    opacity: 1; 
+    visibility: visible; 
+}
+
+#infoOverlay h2 { 
+    font-size: 2rem; 
+    color: #fff; 
+}
+
+#infoText {
+    width: 80vmin;
+    min-height: 30vmin;
+    padding: 3vmin;
+    box-sizing: border-box;
+    font-size: 2.8vmin;
+    line-height: 1.7;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 2vmin;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* メッセージ広場 */
+#plazaOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    background: rgba(2, 4, 30, 0.85);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease, visibility 0.5s;
+}
+#plazaOverlay.show { opacity: 1; visibility: visible; }
+
+#plazaOverlay h2 {
+    position: absolute;
+    top: 9vmin;
+    width: 100%;
+    text-align: center;
+    font-size: 3.5vmin;
+    color: #fff;
+    z-index: 3;
+}
+#plazaSky { position: absolute; inset: 0; overflow: hidden; }
+
+#plazaStatus {
+    position: absolute;
+    bottom: 22vmin;
+    width: 100%;
+    text-align: center;
+    font-size: 2.4vmin;
+    color: rgba(255, 255, 255, 0.75);
+    z-index: 3;
+}
+
+
+/* 流れ星 */
+.meteor {
+    position: absolute;
+    left: 0; top: 0;
+    width: 0; height: 0;
+    will-change: transform;
+}
+.meteor .head {
+    position: absolute;
+    width: 1.4vmin; height: 1.4vmin;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 1.5vmin 0.5vmin rgba(255, 240, 180, 0.9);
+    transform: translate(-50%, -50%);
+}
+.meteor .tail {
+    position: absolute;
+    left: 0; top: 0;
+    width: 20vmin; height: 0.5vmin;
+    transform-origin: 0 50%;
+    background: linear-gradient(to right, rgba(255, 240, 180, 0.95), rgba(255, 240, 180, 0));
+    border-radius: 999px;
+}
+/* 通り過ぎるときのポップアップ */
+.meteor .popup {
+    position: absolute;
+    left: 0; top: 3vmin;
+    width: 30vmin;
+    padding: 1vmin;
+    box-sizing: border-box;
+    background: #fff;
+    border-radius: 1vmin;
+    box-shadow: 0 0 3vmin rgba(255, 240, 180, 0.8);
+    opacity: 0;
+    transform: translateX(-50%) scale(0.6);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+.meteor .popup.show {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+}
+.meteor .popup img { width: 100%; display: block; }
+
+
+/* メッセージの旅 */
+#journeyOverlay {
+    position: absolute;
+    inset: 0;
+    z-index: 7;
+    background: rgba(2, 4, 30, 0.88);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.5s ease, visibility 0.5s;
+}
+#journeyOverlay.show { opacity: 1; visibility: visible; }
+
+#journeyOverlay h2 {
+    position: absolute;
+    top: 7vmin;
+    width: 100%;
+    text-align: center;
+    font-size: 3.5vmin;
+    color: #fff;
+    z-index: 3;
+}
+#journeyStatus {
+    position: absolute;
+    top: 13vmin;
+    width: 100%;
+    text-align: center;
+    font-size: 2.2vmin;
+    color: rgba(255, 255, 255, 0.75);
+    z-index: 3;
+}
+
+#closeJourneyBtn {
+    position: absolute;
+    bottom: 4vmin;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 20vmin;
+    height: 7vmin;
+    font-size: 3vmin;
+    z-index: 4;
+}
+
+#journeySvg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+}
+.pl-label {
+    font-size: 24px;
+    fill: #fff;
+    dominant-baseline: middle;
+}
+
+/* ===== ビーム枠ボタン共通 ===== */
+button {
+    --beam: #ffd700;                       /* ビームの色 */
+    --inner: rgba(55, 159, 135, 0.95);       /* 内側の色 */
+    --border: 2px;                         /* 枠の太さ */
+
+    position: relative;
+    isolation: isolate;                    /* 負のz-indexをボタン内に閉じ込める */
+    overflow: hidden;
+    border: none;
+    border-radius: 999px;
+    background: transparent;
+    color: #ffe9a8;
+    font-family: inherit;
+    font-weight: bold;
+    letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: transform 0.1s, filter 0.2s;
+     /* ...既存の指定... */
+    box-sizing: border-box;
+    width: 20vmin;
+    height: 8vmin;
+    font-size: 3vmin;
+}
+
+/* 回転するビーム */
+button::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 250%;
+    aspect-ratio: 1 / 1;
+    transform: translate(-50%, -50%);
+    background: conic-gradient(
+        from 0deg,
+        transparent 0deg,
+        var(--beam) 60deg,
+        transparent 60deg 360deg
+    );
+    animation: anime-border-beam 4s linear infinite;
+    z-index: -2;
+}
+
+/* 内側（これで枠線に見せる） */
+button::after {
+    content: "";
+    position: absolute;
+    inset: var(--border);
+    background: var(--inner);
+    border-radius: 999px;
+    z-index: -1;
+}
+
+button:hover  { filter: brightness(1.25); }
+button:active { transform: scale(0.95); }
+
+@keyframes anime-border-beam {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to   { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+/* ===== ボタンごとの色 ===== */
+#sendButtonId {                 /* 送信：目立たせる */
+    --beam: #e5ff00;
+    --inner: #ff9f1c;
+    color: #3a2400;
+}
+#launchBtn {                    /* 打ち上げ：赤 */
+    --beam: #fff7c2;
+    --inner: #e0453a;
+    color: #fff;
+    width: 26vmin;    /* 打ち上げだけ少し大きく */
+}
+#clearButtonId {                /* クリア：控えめ */
+    --beam: #ffffff;
+    color: #fff;
+}
+
+#closePlazaBtn {
+    --beam: #ffffff;
+    --inner: rgba(55, 159, 135, 0.95);
+    color: #fff;
+    width: 26vmin;
+
+    position: absolute;      /* ← button共通の relative を上書き */
+    bottom: 9vmin;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    z-index: 3;
+}
+
+#closeJourneyBtn{
+    --beam: #ffffff;
+    --inner: rgba(55, 159, 135, 0.95);
+    color: #fff;
+    width: 26vmin;
+}
+#closeWriteBtn, #backBtn, #closeInfoBtn {   /* 閉じる系：ゆっくり・淡く */
+    --beam: rgba(255, 255, 255, 0.8);
+    color: #ffffff;
+}
+#closeWriteBtn::before, #backBtn::before, #closeInfoBtn::before,
+#closePlazaBtn::before, #closeJourneyBtn::before {
+    animation-duration: 4s;
+}
+
+h3 span{
+    color: #e0453a;
+    font-size: 2rem;
+    text-align: center;
+}
+
+
+/* ペン色・消しゴム */
+#penTools {
+    width: 75vmin;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2vmin;
+}
+.swatch {
+    width: 5vmin;
+    height: 5vmin;
+    border-radius: 50%;
+    border: 0.5vmin solid rgba(255, 255, 255, 0.4);
+    box-sizing: border-box;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+.swatch.active {
+    border-color: #fff;
+    transform: scale(1.25);
+    box-shadow: 0 0 1.5vmin rgba(255, 240, 180, 0.9);
+}
+.swatch.eraser {
+    width: auto;
+    height: 5vmin;
+    padding: 0 2vmin;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    font-size: 2.2vmin;
+    font-weight: bold;
+    color: #333;
+    background: #f2f2f2;
+}
