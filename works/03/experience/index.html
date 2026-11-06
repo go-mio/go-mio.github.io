@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>3D Interactive Sphere with 3D UI</title>
+
+  <style>
+    /* 画面の余白をなくし、スクロールバーを隠す */
+    body {
+      margin: 0;
+      overflow: hidden;
+      background-color: #1a1a2e;
+      background-image: url('back.jpg');
+      background-repeat: no-repeat;
+      background-position: center center;
+      background-size: cover;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      user-select: none;
+      -webkit-user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    /* 豆知識を表示する掲示板（HTMLレイヤー） */
+    #info-board {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.95);
+      padding: 30px;
+      border-radius: 16px;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5);
+      display: none;
+      text-align: center;
+      max-width: 320px;
+      width: 85%;
+      z-index: 100;
+      pointer-events: auto;
+      backdrop-filter: blur(8px);
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translate(-50%, -46%); }
+      to { opacity: 1; transform: translate(-50%, -50%); }
+    }
+
+    #info-board h2 {
+      margin-top: 0;
+      color: #2c3e50;
+      font-size: 1.5rem;
+      border-bottom: 2px solid #eee;
+      padding-bottom: 10px;
+    }
+
+    #info-board p {
+      color: #4a5568;
+      line-height: 1.6;
+      font-size: 0.98rem;
+    }
+
+    #close-btn {
+      margin-top: 20px;
+      padding: 10px 28px;
+      background: linear-gradient(135deg, #e94560, #d13d56);
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-weight: bold;
+      font-size: 0.95rem;
+      box-shadow: 0 4px 12px rgba(233, 69, 96, 0.3);
+      transition: all 0.2s ease;
+    }
+
+    #close-btn:hover {
+      background: linear-gradient(135deg, #d13d56, #b83248);
+      transform: translateY(-1px);
+    }
+
+    /* 3Dキャンバス用の設定 */
+    #canvas-container {
+      width: min(1080px, 100vw, 100vh);
+      height: min(1080px, 100vw, 100vh);
+      aspect-ratio: 1 / 1;
+      display: block;
+      border-radius: 50%;
+      overflow: hidden;
+      box-shadow: 0 0 0 6px rgba(255,255,255,0.08);
+      position: relative;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 3Dを描画するコンテナ -->
+  <div id="canvas-container"></div>
+
+  <!-- 掲示板（豆知識ポップアップ） -->
+  <div id="info-board">
+    <h2 id="board-title">豆知識</h2>
+    <p id="board-text">ここにピンに応じたテキストが表示されます。</p>
+    <button id="close-btn">閉じる</button>
+  </div>
+
+  <!-- Three.jsモジュールの読み込み（CDN） -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // --- 1. 基本設定（シーン、カメラ、レンダラー） ---
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 10000);
+    camera.position.set(0, 0, 7.2);
+    scene.add(camera);
+
+    const displaySize = Math.min(window.innerWidth, window.innerHeight, 1080);
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(displaySize, displaySize);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.domElement.style.display = 'block';
+    container.appendChild(renderer.domElement);
+
+    // --- 2. 照明（ライト） ---
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 5, 5);
+    scene.add(directionalLight);
+
+    // --- 3. コントロール（スワイプ・ドラッグで回す） ---
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.enablePan = false;
+    controls.minDistance = 0.2;
+    controls.maxDistance = 5000;
+
+    // --- 4. 豆知識データの準備 ---
+    const triviaData = {
+      pin_1: { title: '太陽の光', text: '太陽の中心から長い年月をかけて表面に出たエネルギーは、約8分19秒で地球に届きます。' },
+      pin_2: { title: '水星の表面温度', text: '水星の表面温度は太陽系で一番の寒暖差であり、昼は約430℃、夜は約-180℃まで変化します。' },
+      pin_3: { title: '金星の特徴', text: '金星は他の惑星と違って逆向きに自転しているため、西から太陽が登ります。' },
+      pin_4: { title: '地球の特徴', text: '太陽との距離が適切であり、適度な温度、そして水の存在からハビタブルゾーンと呼ばれています。' },
+      pin_5: { title: '火星の火山', text: '火星最大の火山であるオリンポス山は、地球最大のハワイのマウナ・ロア山の100倍以上の大きさです。' },
+      pin_6: { title: '木星のオーロラ', text: '木星のオーロラは大規模なエネルギーを持っているため、地球のオーロラよりもはるかに凄まじい明るさで光ります。' },
+      pin_7: { title: '土星の環', text: '土星の環は非常に薄く、地球から見て環の傾きがほぼ無くなることがあります。これを土星の環の消失と呼びます。' },
+      pin_8: { title: '天王星の傾き', text: '天王星は自転軸が公転面に対して98度傾いており、自転軸を横向きにした状態で太陽のまわりを回っています。' },
+      pin_9: { title: '海王星の風', text: '海王星の風速は太陽系内最大と言われており、最大風速は秒速約600mを超えます。' }
+    };
+
+    const modelPinConfigs = [
+      { size: 0.10 }, { size: 0.11 }, { size: 0.09 }, { size: 0.10 },
+      { size: 0.09 }, { size: 0.11 }, { size: 0.10 }, { size: 0.10 }, { size: 0.10 }
+    ];
+
+    const mainModelGroup = new THREE.Group();
+    scene.add(mainModelGroup);
+
+    const gltfLoader = new GLTFLoader();
+    const assetBaseUrl = location.protocol === 'file:' ? 'http://localhost:8000/' : './';
+    const glbModelPaths = [
+      'models/planet_1.glb',
+      'models/planet_2.glb',
+      'models/planet_3.glb',
+      'models/planet_4.glb',
+      'models/planet_5.glb',
+      'models/planet_6.glb',
+      'models/planet_7.glb',
+      'models/planet_8.glb',
+      'models/planet_9.glb'
+    ].map((path) => `${assetBaseUrl}${path}`);
+
+    const mainDisplayDiameter = 2.9; 
+    const referencePlanetIndex = 1;  
+    let globalScale = 1.0; 
+    let currentMainSphere = null;
+
+    // ★★★ パーティクル用の発光テクスチャを生成 ★★★
+    function createParticleTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 32;
+      canvas.height = 32;
+      const ctx = canvas.getContext('2d');
+      const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      gradient.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      gradient.addColorStop(0.2, 'rgba(170, 238, 255, 0.8)');
+      gradient.addColorStop(0.5, 'rgba(0, 100, 255, 0.2)');
+      gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, 32, 32);
+      return new THREE.CanvasTexture(canvas);
+    }
+    const particleTexture = createParticleTexture();
+
+    // ★★★ ピンのデザインを美しい複合ジオメトリに変更 ★★★
+    function addPinToDisplay(displayRoot, modelIndex) {
+      const pinConfig = modelPinConfigs[modelIndex] || modelPinConfigs[0];
+      const baseSize = pinConfig.size;
+
+      const pinLayer = new THREE.Group();
+      const visualGroup = new THREE.Group();
+      
+      // 1. クリスタル (八面体)
+      const crystalGeo = new THREE.OctahedronGeometry(baseSize * 0.5);
+      const crystalMat = new THREE.MeshStandardMaterial({ 
+        color: 0x88ccff, 
+        emissive: 0x2255aa, 
+        roughness: 0.1, 
+        metalness: 0.8,
+        transparent: true,
+        opacity: 1
+      });
+      const crystal = new THREE.Mesh(crystalGeo, crystalMat);
+      crystal.position.y = baseSize * 0.5;
+      crystal.userData.baseOpacity = 1;
+      crystal.userData.currentOpacity = 1;
+      crystal.userData.baseY = baseSize * 0.5;
+      visualGroup.add(crystal);
+
+      // 2. 光のオーラ (球体)
+      const auraGeo = new THREE.SphereGeometry(baseSize * 0.8, 16, 16);
+      const auraMat = new THREE.MeshBasicMaterial({
+        color: 0x55aaff,
+        transparent: true,
+        opacity: 0.4,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true
+      });
+      const aura = new THREE.Mesh(auraGeo, auraMat);
+      aura.position.y = baseSize * 0.5;
+      aura.userData.baseOpacity = 0.4;
+      aura.userData.currentOpacity = 0.4;
+      visualGroup.add(aura);
+
+      // 3. 光の柱 (上昇する粒子の集まり)
+      const particleCount = 60;
+      const posArray = new Float32Array(particleCount * 3);
+      const phaseArray = new Float32Array(particleCount);
+      for(let i=0; i<particleCount; i++) {
+        posArray[i*3] = (Math.random() - 0.5) * baseSize * 0.5;
+        posArray[i*3+1] = Math.random() * baseSize * 5;
+        posArray[i*3+2] = (Math.random() - 0.5) * baseSize * 0.5;
+        phaseArray[i] = Math.random();
+      }
+      const particleGeo = new THREE.BufferGeometry();
+      particleGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      particleGeo.setAttribute('phase', new THREE.BufferAttribute(phaseArray, 1));
+      const particleMat = new THREE.PointsMaterial({
+        color: 0xaaeeff,
+        size: baseSize * 1.5,
+        map: particleTexture,
+        transparent: true,
+        opacity: 0.7,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true
+      });
+      const particles = new THREE.Points(particleGeo, particleMat);
+      particles.userData.baseOpacity = 0.7;
+      particles.userData.currentOpacity = 0.7;
+      particles.userData.baseSize = baseSize;
+      visualGroup.add(particles);
+
+      // 4. 光の輪 (波紋のように広がるリング)
+      const ringGeo = new THREE.TorusGeometry(baseSize * 1.0, baseSize * 0.03, 16, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        depthTest: true
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 2;
+      ring.userData.baseOpacity = 0.8;
+      ring.userData.currentOpacity = 0.0;
+      ring.userData.progress = Math.random(); // 初期タイミングをずらす
+      visualGroup.add(ring);
+
+      // ヒット判定用（非表示）
+      const hitGeo = new THREE.SphereGeometry(baseSize * 3.0, 16, 16);
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false, depthWrite: false });
+      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+
+      const sphereRadius = 1.45;
+      const randomDirection = new THREE.Vector3().randomDirection();
+      const position = randomDirection.clone().multiplyScalar(sphereRadius);
+      
+      pinLayer.position.copy(position);
+      hitMesh.position.copy(position);
+
+      // 惑星の外側を向くように設定
+      const up = new THREE.Vector3(0, 1, 0);
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(up, randomDirection);
+      pinLayer.quaternion.copy(quaternion);
+
+      pinLayer.add(visualGroup);
+      
+      const pinName = 'pin_' + (modelIndex + 1);
+      hitMesh.name = pinName;
+      hitMesh.userData.isPin = true;
+      visualGroup.userData.isPin = true;
+      visualGroup.name = pinName;
+
+      pinLayer.visible = false;
+      hitMesh.visible = false;
+
+      // まとめる
+      const rootLayer = new THREE.Group();
+      rootLayer.add(pinLayer);
+      rootLayer.add(hitMesh);
+
+      // アニメーション用の状態管理を追加
+      rootLayer.userData = {
+        isAnimatingOut: false,
+        animProgress: 0,
+        baseScale: 1.0,
+        time: Math.random() * 100
+      };
+
+      displayRoot.add(rootLayer);
+      displayRoot.userData.pinLayer = rootLayer;
+      displayRoot.userData.pin = pinLayer;
+      displayRoot.userData.pinVisual = visualGroup;
+      displayRoot.userData.pinHit = hitMesh;
+      displayRoot.userData.crystal = crystal;
+      displayRoot.userData.aura = aura;
+      displayRoot.userData.ring = ring;
+      displayRoot.userData.particles = particles;
+    }
+
+    // ★★★ ピンのサイズと位置の調整処理 ★★★
+    function scalePinToModel(displayRoot, modelRadius = 1.45, modelScale = 1.0) {
+      const rootLayer = displayRoot.userData.pinLayer;
+      const pin = displayRoot.userData.pin;
+      const hitMesh = displayRoot.userData.pinHit;
+      if (!pin || !hitMesh) return;
+
+      const modelIndex = displayRoot.userData.modelIndex ?? 0;
+      const basePinSize = modelPinConfigs[modelIndex]?.size || 0.08;
+      const adaptiveSize = Math.max(basePinSize * (modelRadius / 1.45) * (1.0 / Math.max(modelScale, 0.1)), 0.02);
+      
+      const newScale = adaptiveSize / basePinSize;
+      pin.scale.setScalar(newScale);
+      hitMesh.scale.setScalar(newScale);
+      
+      // アニメーション用に元のサイズを保存
+      rootLayer.userData.baseScale = newScale;
+
+      const randomDirection = new THREE.Vector3().randomDirection();
+      let surfaceRadius = Math.max(modelRadius, 0.05);
+
+      if (modelIndex === 6) {
+        surfaceRadius = Math.max(modelRadius * 0.52, 0.05);
+      }
+
+      const position = randomDirection.clone().multiplyScalar(surfaceRadius);
+      pin.position.copy(position);
+      hitMesh.position.copy(position);
+
+      // 向きを再計算
+      const up = new THREE.Vector3(0, 1, 0);
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(up, randomDirection);
+      pin.quaternion.copy(quaternion);
+    }
+
+    function loadMainSphere(modelIndex, options = {}) {
+      const safeModelIndex = modelIndex % glbModelPaths.length;
+      const { showPins = false } = options;
+
+      const previousDistance = camera.position.distanceTo(controls.target);
+      const previousDirection = new THREE.Vector3().subVectors(camera.position, controls.target);
+      if (previousDirection.lengthSq() === 0) {
+        previousDirection.set(0, 0, -1);
+      }
+      previousDirection.normalize();
+
+      if (currentMainSphere) {
+        mainModelGroup.remove(currentMainSphere);
+      }
+
+      mainModelGroup.scale.set(1, 1, 1);
+      mainModelGroup.position.set(0, 0, 0);
+      mainModelGroup.rotation.set(0, 0, 0);
+
+      const displayRoot = new THREE.Group();
+      displayRoot.position.set(0, 0, 0);
+      displayRoot.userData.isMainDisplay = true;
+      displayRoot.userData.shouldShowPins = showPins;
+      displayRoot.userData.preservedCameraDistance = previousDistance;
+      displayRoot.userData.preservedCameraDirection = previousDirection.clone();
+
+      const baseSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(1.45, 48, 48),
+        new THREE.MeshStandardMaterial({ color: 0x4ecca3, roughness: 0.3, metalness: 0.1, visible: false })
+      );
+      displayRoot.add(baseSphere);
+
+      currentMainSphere = displayRoot;
+      addPinToDisplay(displayRoot, safeModelIndex);
+
+      const modelPath = glbModelPaths[safeModelIndex];
+      const resolvedModelPath = safeModelIndex === 0 && location.protocol === 'file:'
+        ? 'http://localhost:8000/models/planet_1.glb'
+        : modelPath;
+
+      gltfLoader.load(
+        resolvedModelPath,
+        (gltf) => {
+          if (currentMainSphere !== displayRoot) return;
+
+          const model = gltf.scene;
+          model.scale.set(globalScale, globalScale, globalScale);
+          
+          const box = new THREE.Box3().setFromObject(model);
+          const center = box.getCenter(new THREE.Vector3());
+          model.position.sub(center);
+
+          displayRoot.add(model);
+
+          const size = box.getSize(new THREE.Vector3());
+          const maxDim = Math.max(size.x, size.y, size.z);
+          const surfaceRadius = maxDim * 0.5 + 0.06;
+          displayRoot.userData.modelIndex = safeModelIndex;
+          scalePinToModel(displayRoot, surfaceRadius, globalScale);
+
+          const preservedCameraDistance = displayRoot.userData.preservedCameraDistance ?? camera.position.distanceTo(controls.target);
+          const preservedCameraDirection = displayRoot.userData.preservedCameraDirection ?? new THREE.Vector3(0, 0, -1);
+
+          controls.minDistance = (maxDim / 2) + 0.3;
+
+          const targetDistance = THREE.MathUtils.clamp(preservedCameraDistance, controls.minDistance, controls.maxDistance);
+          camera.position.copy(controls.target).add(preservedCameraDirection.multiplyScalar(targetDistance));
+          controls.update();
+
+          // UI操作時のみピンを表示する。初期表示では非表示のまま。
+          if (displayRoot.userData.pin) {
+            const shouldShowPins = !!displayRoot.userData.shouldShowPins;
+            displayRoot.userData.pin.visible = shouldShowPins;
+            if (displayRoot.userData.pinHit) {
+              displayRoot.userData.pinHit.visible = shouldShowPins;
+            }
+            displayRoot.userData.pinLayer.userData.isAnimatingOut = false;
+          }
+        },
+        undefined,
+        (err) => {
+          console.warn(`GLBの読み込みに失敗: ${modelPath}。代わりに球体を表示します。`, err);
+        }
+      );
+
+      displayRoot.renderOrder = 80;
+      mainModelGroup.add(displayRoot);
+    }
+
+    async function initializeApp() {
+      try {
+        const refPath = glbModelPaths[referencePlanetIndex];
+        const gltf = await gltfLoader.loadAsync(refPath);
+        const box = new THREE.Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z) || 1;
+        globalScale = mainDisplayDiameter / maxDim;
+      } catch (error) {
+        console.warn("基準モデルの読み込みに失敗しました。スケールを1.0とします。", error);
+        globalScale = 1.0;
+      }
+      loadMainSphere(1, { showPins: false });
+    }
+    initializeApp();
+
+    // --- 5. 画面下の8つの小球体（3D UI） ---
+    const uiGroup = new THREE.Group();
+    uiGroup.renderOrder = 100;
+
+    const originalDistance = 4.5;
+    const safeDistance = 0.5;
+    const uiScale = safeDistance / originalDistance;
+
+    // ★修正: 計算式の構文エラーを修正
+    uiGroup.position.set(0, -1.0 * uiScale, -safeDistance);
+    uiGroup.scale.set(uiScale * 0.7, uiScale * 0.7, uiScale * 0.7);
+    camera.add(uiGroup);
+
+    const uiButtonRadius = 0.14;
+    const arcRadius = 1.8;
+    const uiPlanetCount = 9;
+    const uiSpread = 1.15;
+    const uiStartAngle = -uiSpread / 2;
+    const uiAngleStep = uiSpread / (uiPlanetCount - 1); // ★修正: 構文エラーを修正
+
+    for (let i = 0; i < uiPlanetCount; i++) {
+      const uiBtnGroup = new THREE.Group();
+      uiBtnGroup.renderOrder = i === 6 ? 90 : 110;
+      
+      const angle = uiStartAngle + i * uiAngleStep;
+      uiBtnGroup.position.x = Math.sin(angle) * arcRadius;
+      uiBtnGroup.position.y = (1 - Math.cos(angle)) * arcRadius;
+      uiBtnGroup.position.z = 0;
+      
+      uiBtnGroup.userData.isUIButton = true;
+      uiBtnGroup.userData.modelIndex = i;
+      
+      const hitGeo = new THREE.SphereGeometry(uiButtonRadius, 16, 16);
+      const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+      const hitMesh = new THREE.Mesh(hitGeo, hitMat);
+      uiBtnGroup.add(hitMesh);
+      
+      uiGroup.add(uiBtnGroup);
+
+      const modelPath = glbModelPaths[i % glbModelPaths.length];
+      gltfLoader.load(modelPath, (gltf) => {
+        const uiModel = gltf.scene;
+        const box = new THREE.Box3().setFromObject(uiModel);
+        const size = box.getSize(new THREE.Vector3());
+        const center = box.getCenter(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+
+        const baseScale = (uiButtonRadius * 1.8) / maxDim;
+        const scale = i === 6 ? baseScale * 1.8 : baseScale;
+        uiModel.scale.set(scale, scale, scale);
+        uiModel.position.sub(center.multiplyScalar(scale));
+
+        uiBtnGroup.add(uiModel);
+      });
+    }
+
+    // --- 6. タッチ・クリック判定（Raycaster） ---
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+
+    const infoBoard = document.getElementById('info-board');
+    const boardTitle = document.getElementById('board-title');
+    const boardText = document.getElementById('board-text');
+
+    function getPointerPosition(event) {
+      const rect = container.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const y = event.clientY - rect.top;
+      pointer.x = (x / rect.width) * 2 - 1;
+      pointer.y = -(y / rect.height) * 2 + 1;
+      return pointer;
+    }
+
+    function onPointerDown(event) {
+      if (event.target.tagName !== 'CANVAS') return;
+
+      const ptr = getPointerPosition(event);
+      raycaster.setFromCamera(ptr, camera);
+
+      // ★修正: UIとメインモデル全体を判定対象にする
+      const intersects = raycaster.intersectObjects([uiGroup, mainModelGroup], true);
+      if (intersects.length === 0) return;
+
+      const clickedObj = intersects[0].object;
+
+      let uiNode = clickedObj;
+      while (uiNode && !uiNode.userData.isUIButton) { uiNode = uiNode.parent; }
+      if (uiNode && uiNode.userData.isUIButton) {
+        loadMainSphere(uiNode.userData.modelIndex, { showPins: true });
+        uiNode.scale.set(1.2, 1.2, 1.2);
+        setTimeout(() => uiNode.scale.set(1, 1, 1), 200);
+        return;
+      }
+
+      let pinNode = clickedObj;
+      while (pinNode && !(pinNode.userData.isPin || (pinNode.name && pinNode.name.startsWith('pin_')))) { 
+        pinNode = pinNode.parent; 
+      }
+      
+      if (pinNode && (pinNode.userData.isPin || pinNode.name.startsWith('pin_'))) {
+        const data = triviaData[pinNode.name] || { title: '情報', text: 'このポイントに関する情報はありません。' };
+        boardTitle.textContent = data.title;
+        boardText.innerHTML = data.text;
+        infoBoard.style.display = 'block';
+
+        // ★追加: クリックされたら、ふわっと消えるアニメーションを開始
+        if (currentMainSphere && currentMainSphere.userData.pinLayer) {
+          currentMainSphere.userData.pinLayer.userData.isAnimatingOut = true;
+          currentMainSphere.userData.pinLayer.userData.animProgress = 0;
+        }
+        return;
+      }
+
+      // メイン惑星本体をクリックしてもピンは復活させない。
+      // ピンの復活は UI を触ったときだけを許可する。
+    }
+
+    window.addEventListener('pointerdown', onPointerDown);
+
+    document.getElementById('close-btn').addEventListener('click', () => {
+      infoBoard.style.display = 'none';
+    });
+
+    // --- 7. アニメーションとリサイズ対応 ---
+    function animate() {
+      requestAnimationFrame(animate);
+
+      // ★★★ 複合ジオメトリの常時アニメーションとフェードアウト処理 ★★★
+      if (currentMainSphere && currentMainSphere.userData.pinLayer) {
+        const rootLayer = currentMainSphere.userData.pinLayer;
+        const pin = currentMainSphere.userData.pin;
+        const pinHit = currentMainSphere.userData.pinHit;
+        const crystal = currentMainSphere.userData.crystal;
+        const aura = currentMainSphere.userData.aura;
+        const ring = currentMainSphere.userData.ring;
+        const particles = currentMainSphere.userData.particles;
+        const visualGroup = currentMainSphere.userData.pinVisual;
+
+        // 常時アニメーション (浮遊、回転、脈動)
+        rootLayer.userData.time += 0.05;
+        const t = rootLayer.userData.time;
+        
+        if (crystal) {
+            crystal.rotation.y = t * 0.5;
+            crystal.position.y = (crystal.userData.baseY || 0) + Math.sin(t * 2) * 0.01;
+        }
+        
+        if (aura) {
+            const scale = 1.0 + Math.sin(t * 3) * 0.1;
+            aura.scale.setScalar(scale);
+        }
+
+        // 光の粒子 (上昇)
+        if (particles) {
+          const pos = particles.geometry.attributes.position.array;
+          const phase = particles.geometry.attributes.phase.array;
+          const bSize = particles.userData.baseSize;
+          for(let i=0; i<phase.length; i++) {
+            phase[i] += 0.012; // 上昇スピード
+            if (phase[i] > 1.0) {
+              phase[i] = 0.0;
+              // 底面付近にリセット
+              pos[i*3] = (Math.random() - 0.5) * bSize * 0.8;
+              pos[i*3+2] = (Math.random() - 0.5) * bSize * 0.8;
+            }
+            pos[i*3+1] = phase[i] * bSize * 6.0; // 高さ
+            // 上にいくほど少し広がる
+            pos[i*3] *= 1.015;
+            pos[i*3+2] *= 1.015;
+          }
+          particles.geometry.attributes.position.needsUpdate = true;
+        }
+
+        // 光のリング (波紋のように広がって消える)
+        if (ring) {
+          ring.userData.progress += 0.015;
+          if (ring.userData.progress > 1.0) ring.userData.progress = 0.0;
+          
+          const p = ring.userData.progress;
+          ring.scale.setScalar(0.5 + p * 2.5); // 広がる
+          
+          // 現れてから消える透過度計算
+          let op = 0;
+          if (p < 0.2) op = p / 0.2; // 0%~20%でフェードイン
+          else op = 1.0 - ((p - 0.2) / 0.8); // 20%~100%でフェードアウト
+          
+          ring.userData.currentOpacity = ring.userData.baseOpacity * op;
+        }
+
+        // 全体のフェードアウトアニメーション（クリック時）
+        let opacityMult = 1.0;
+        if (rootLayer.userData.isAnimatingOut) {
+          rootLayer.userData.animProgress += 0.04;
+          const p = rootLayer.userData.animProgress;
+
+          const currentScale = rootLayer.userData.baseScale * (1.0 + p * 0.7);
+          pin.scale.setScalar(currentScale);
+
+          opacityMult = Math.max(0, 1.0 - p * 1.1);
+
+          if (p >= 1.0 || opacityMult <= 0) {
+            rootLayer.userData.isAnimatingOut = false;
+            pin.visible = false;
+            if (pinHit) pinHit.visible = false;
+          }
+        }
+
+        // アニメーションを考慮して最終的な透明度を適用
+        visualGroup.children.forEach(child => {
+          if (child.material && child.userData.currentOpacity !== undefined) {
+            child.material.opacity = child.userData.currentOpacity * opacityMult;
+          }
+        });
+      }
+
+      mainModelGroup.scale.set(1, 1, 1);
+      mainModelGroup.position.set(0, 0, 0);
+      mainModelGroup.rotation.set(0, 0, 0);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      const size = Math.min(window.innerWidth, window.innerHeight, 1080);
+      camera.aspect = 1;
+      camera.updateProjectionMatrix();
+      renderer.setSize(size, size);
+
+      container.style.width = `${size}px`;
+      container.style.height = `${size}px`;
+    });
+  </script>
+</body>
+</html>

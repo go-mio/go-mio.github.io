@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <title>MIO EYE | 観測体験</title>
+  <link rel="stylesheet" href="./style.css?v=20261102-rebuild">
+  <script type="importmap">
+    {"imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }}
+  </script>
+</head>
+<body>
+  <div id="screen">
+    <canvas id="fx"></canvas>
+    <div id="ui">
+      <div id="heading">MIO EYE</div>
+      <div id="sub">1本指で空の色をアレンジ · 2本指で回転</div>
+      <div id="discovery">見えない世界が、ひらかれる。</div>
+      <div id="status">触って観察しよう</div>
+       <button id="reset" type="button" hidden>↺ 最初に戻る</button>
+      <div id="err"></div>
+    </div>
+  </div>
+  <div id="controls">
+    <button id="kiosk" type="button">展示モード</button>
+  </div>
+  <div id="note">科学的知見に着想を得た創作的可視化（実測データではありません） · K: 展示モード / R: リセット</div>
+  <script type="module" src="./main.js?v=20261102-rebuild"></script>
+</body>
+</html>
