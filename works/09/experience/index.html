@@ -1,0 +1,469 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>宇宙の生き物を考えよう</title>
+<style>
+  :root{--u:max(.5px,calc(min(100vw,100vh)/1080));--paper:min(92vw,52vh);
+        --top:env(safe-area-inset-top,0px);--bottom:env(safe-area-inset-bottom,0px)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+  html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;overscroll-behavior:none;
+    font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic UI","Meiryo",sans-serif;color:#2b3558}
+
+  /* 画面いっぱいに表示（端末の画面サイズに追従） */
+  #stage{position:fixed;inset:0;overflow:hidden;background:#f4dcc8}
+  #view{position:absolute;left:0;top:0;width:100%;height:100%;display:block}
+
+  button{font-family:inherit;cursor:pointer;border:none;color:inherit}
+  .big{font-size:calc(36*var(--u));font-weight:700;padding:0 calc(44*var(--u));height:calc(92*var(--u));
+    border-radius:calc(46*var(--u));color:#3a2300;background:#ffb938;box-shadow:0 calc(12*var(--u)) calc(28*var(--u)) rgba(0,0,0,.35)}
+
+  /* ---- ふだんの画面（HUD） ---- */
+  #demo{position:absolute;top:calc(var(--top) + 50*var(--u));left:0;right:0;padding:0 4vw;text-align:center;
+    font-size:calc(30*var(--u));line-height:1.5;font-weight:700;letter-spacing:.04em}
+  #hint{position:absolute;bottom:calc(var(--bottom) + 150*var(--u));left:0;right:0;padding:0 4vw;text-align:center;
+    font-size:calc(28*var(--u));opacity:.75;pointer-events:none}
+  #openBtn{position:absolute;bottom:calc(var(--bottom) + 48*var(--u));left:50%;width:calc(340*var(--u));margin-left:calc(-170*var(--u))}
+  #demo,#hint,#openBtn{transition:opacity .2s}
+  #stage.drawing #demo,#stage.drawing #hint,#stage.drawing #openBtn{opacity:0;pointer-events:none}
+
+  /* ---- 描画オーバーレイ ---- */
+  #overlay{color:#fff;position:absolute;inset:0;background:rgba(4,8,28,.86);transition:opacity .25s;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:calc(22*var(--u));
+    padding:calc(var(--top) + 16px) 4vw calc(var(--bottom) + 16px)}
+  #overlay.hidden{opacity:0;pointer-events:none}
+  #otitle{font-size:calc(42*var(--u));font-weight:700;text-align:center}
+  #paper{flex:none;width:var(--paper);height:var(--paper);border-radius:calc(40*var(--u));touch-action:none;
+    background:rgba(255,255,255,.07);border:3px dashed rgba(255,255,255,.35)}
+  #tools{display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:calc(18*var(--u)) calc(28*var(--u))}
+  #sizes,#palette{display:flex;gap:calc(14*var(--u))}
+  .sz{width:calc(68*var(--u));height:calc(68*var(--u));border-radius:50%;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center}
+  .sz i{display:block;border-radius:50%;background:#fff}
+  .sz.sel,.sw.sel{outline:calc(4*var(--u)) solid #ffe066;outline-offset:calc(3*var(--u))}
+  .sw{width:calc(52*var(--u));height:calc(52*var(--u));border-radius:50%;border:3px solid rgba(255,255,255,.7)}
+  #closeBtn{position:absolute;top:calc(var(--top) + 24*var(--u));right:calc(24*var(--u));width:calc(68*var(--u));height:calc(68*var(--u));
+    border-radius:50%;font-size:calc(40*var(--u));line-height:1;background:rgba(255,255,255,.14)}
+  #actions{display:flex;gap:calc(18*var(--u))}
+  .sub{height:calc(84*var(--u));padding:0 calc(30*var(--u));border-radius:calc(42*var(--u));font-size:calc(28*var(--u));font-weight:700;background:rgba(255,255,255,.16)}
+  #born{height:calc(84*var(--u));font-size:calc(32*var(--u));padding:0 calc(36*var(--u))}
+  #msg{position:absolute;left:0;right:0;top:50%;text-align:center;font-size:calc(30*var(--u));font-weight:700;
+    pointer-events:none;opacity:0;transition:opacity .25s;text-shadow:0 2px 10px #000}
+  #msg.show{opacity:1}
+</style>
+</head>
+<body>
+<div id="stage">
+  <canvas id="view"></canvas>
+
+  <div id="demo">水星探査は将来、他の惑星の生き物を<br>探す役に立つと言われているよ</div>
+  <div id="hint">地球以外に生き物がいたら<br>どんな見た目かな？</div>
+  <button id="openBtn" class="big">✎ えをかく</button>
+
+  <div id="overlay" class="hidden">
+    <div id="otitle">いきものを描いてね</div>
+    <canvas id="paper" width="560" height="560"></canvas>
+    <div id="tools"><div id="sizes"></div><div id="palette"></div></div>
+    <div id="actions">
+      <button id="undo" class="sub">もどす</button>
+      <button id="clear" class="sub">消す</button>
+      <button id="born" class="big">うまれる！</button>
+    </div>
+    <button id="closeBtn" aria-label="とじる">×</button>
+    <div id="msg"></div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* =====================================================
+   設定（展示に合わせてここを調整してください）
+   ===================================================== */
+const CFG = {
+  maxCreatures: 20,        // 同時に存在できる最大数。超えたら古いものから消える
+  sizeRange: [130, 170],   // いきものの大きさ（長辺px）
+  idleCloseSec: 90         // 描画画面を放置したとき自動で閉じるまでの秒数
+};
+
+const TAU = Math.PI * 2;
+let W = 1080, H = 1080, CX = 540, K = 1;   // 画面サイズ・中心X・大きさの倍率（layout() が更新）
+let areaTop = 200, areaBottom = 800;       // いきものが動ける縦の範囲（デモテキストの下〜ボタンの上）
+const rand = (a, b) => a + Math.random() * (b - a);
+const pick = a => a[(Math.random() * a.length) | 0];
+const easeOutBack = t => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2); };
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+/* ---------- ステージの拡縮 ---------- */
+const stage = document.getElementById('stage');
+
+/* =====================================================
+   スプライト生成（描いた絵 → いきもの用画像）
+   ===================================================== */
+const SPRITE_MAX = 256, SPRITE_PAD = 14;
+
+function spriteFromCanvas(src) {
+  const w = src.width, h = src.height;
+  const d = src.getContext('2d').getImageData(0, 0, w, h).data;
+  let minX = w, minY = h, maxX = -1, maxY = -1;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    if (d[(y * w + x) * 4 + 3] > 20) {
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+    }
+  }
+  if (maxX < 0) return null;
+  const bw = maxX - minX + 1, bh = maxY - minY + 1;
+  if (bw < 28 && bh < 28) return { tooSmall: true };
+  const k = Math.min(SPRITE_MAX / Math.max(bw, bh), 1.5);
+  const sw = Math.max(8, Math.round(bw * k)), sh = Math.max(8, Math.round(bh * k));
+  const c = document.createElement('canvas');
+  c.width = sw + SPRITE_PAD * 2; c.height = sh + SPRITE_PAD * 2;
+  const g = c.getContext('2d');
+  g.imageSmoothingQuality = 'high';
+  g.shadowColor = 'rgba(60,70,120,.35)'; g.shadowBlur = 8; // 明るい背景でも輪郭が見えるよう薄く影をつける
+  g.drawImage(src, minX, minY, bw, bh, SPRITE_PAD, SPRITE_PAD, sw, sh);
+  return c;
+}
+
+/* ---------- デモ用の初期いきもの（コードで描いたもの） ---------- */
+function seedSprite(kind) {
+  const c = document.createElement('canvas'); c.width = 560; c.height = 560;
+  const g = c.getContext('2d'); g.lineCap = 'round'; g.lineJoin = 'round';
+  // F: 塗りつぶし図形 / L: 線（細い部分）
+  const F = (col, fn) => { g.fillStyle = col; g.beginPath(); fn(); g.fill(); };
+  const L = (col, w, fn) => { g.strokeStyle = col; g.lineWidth = w; g.beginPath(); fn(); g.stroke(); };
+  const circ = (x, y, r) => g.arc(x, y, r, 0, TAU);
+  const eye = (x, y, r) => { F('#fff', () => circ(x, y, r)); F('#2a2f4a', () => circ(x + r * .25, y, r * .5)); };
+  if (kind === 0) {            // まるい子
+    L('#ff7fc4', 14, () => { g.moveTo(235, 205); g.quadraticCurveTo(205, 130, 165, 120); });
+    L('#ff7fc4', 14, () => { g.moveTo(325, 205); g.quadraticCurveTo(355, 130, 395, 120); });
+    F('#ff7fc4', () => circ(165, 120, 20)); F('#ff7fc4', () => circ(395, 120, 20));
+    F('#ff9f3a', () => g.ellipse(228, 462, 30, 22, 0, 0, TAU)); F('#ff9f3a', () => g.ellipse(335, 462, 30, 22, 0, 0, TAU));
+    F('#ffb454', () => circ(280, 320, 125));
+    F('#ffd9a0', () => g.ellipse(280, 365, 80, 60, 0, 0, TAU));
+    F('#ff8a8a', () => circ(205, 345, 18)); F('#ff8a8a', () => circ(355, 345, 18));
+    eye(242, 295, 24); eye(320, 295, 24);
+    L('#8a3a1a', 8, () => g.arc(282, 335, 30, .2, Math.PI - .2));
+  } else if (kind === 1) {     // さかな
+    F('#8f6bff', () => { g.moveTo(290, 215); g.quadraticCurveTo(320, 140, 380, 165); g.lineTo(350, 235); g.closePath(); });
+    F('#8f6bff', () => { g.moveTo(290, 365); g.quadraticCurveTo(320, 440, 380, 415); g.lineTo(350, 345); g.closePath(); });
+    F('#3fb4f5', () => { g.moveTo(170, 290); g.lineTo(65, 205); g.lineTo(65, 375); g.closePath(); });
+    F('#4dc3ff', () => g.ellipse(300, 290, 150, 95, 0, 0, TAU));
+    F('#bfeaff', () => g.ellipse(310, 330, 105, 40, 0, 0, TAU));
+    for (let i = 0; i < 3; i++) L('#2fb36a', 10, () => g.arc(235 + i * 38, 285, 18, Math.PI * 1.1, Math.PI * 1.9));
+    eye(385, 262, 24);
+    L('#1d4f7a', 8, () => g.arc(418, 305, 20, .3, 2.4));
+  } else {                     // いもむし
+    for (let i = 0; i < 4; i++) {
+      const x = 120 + i * 100, y = 300 + Math.sin(i * 1.4) * 22;
+      L('#f5b83a', 14, () => { g.moveTo(x, y + 40); g.lineTo(x - 6, y + 90); });
+    }
+    for (let i = 0; i < 4; i++) {
+      const x = 120 + i * 100, y = 300 + Math.sin(i * 1.4) * 22;
+      F(i % 2 ? '#8fe8a8' : '#5fd88a', () => circ(x, y, 56));
+    }
+    L('#ff5a6f', 10, () => { g.moveTo(500, 245); g.quadraticCurveTo(480, 185, 440, 180); });
+    L('#ff5a6f', 10, () => { g.moveTo(535, 240); g.quadraticCurveTo(545, 180, 580, 170); });
+    F('#ff5a6f', () => circ(440, 180, 12)); F('#ff5a6f', () => circ(580, 170, 12));
+    F('#a47bff', () => circ(520, 290, 68));
+    eye(525, 270, 20); eye(490, 285, 15);
+    L('#fff', 7, () => g.arc(525, 318, 20, .3, 2.6));
+  }
+  return spriteFromCanvas(c);
+}
+
+/* =====================================================
+   いきもの
+   ===================================================== */
+const view = document.getElementById('view');
+const ctx = view.getContext('2d');
+
+// 画面サイズに合わせて canvas と動ける範囲を更新
+function layout() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  W = stage.clientWidth; H = stage.clientHeight; CX = W / 2;
+  view.width = Math.round(W * dpr); view.height = Math.round(H * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  K = Math.min(1, Math.max(.55, Math.min(W, H) / 900));
+  areaTop = document.getElementById('demo').getBoundingClientRect().bottom + 16;
+  areaBottom = Math.max(document.getElementById('hint').getBoundingClientRect().top - 12, areaTop + 160);
+}
+addEventListener('resize', layout);
+layout();
+const creatures = [];
+const parts = [], rings = [];
+
+function burst(x, y, n, spd) {
+  for (let i = 0; i < n; i++) {
+    const a = rand(0, TAU), v = rand(.4, 1) * spd;
+    parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 0, max: rand(.6, 1.2), r: rand(2, 6), h: rand(0, 360) });
+  }
+  rings.push({ x, y, t: 0, max: .9, R: spd * .55 });
+}
+
+function addCreature(o) {
+  const sp = o.sprite, ar = sp.width / sp.height, L = o.size * K;
+  const dw = ar >= 1 ? L : L * ar, dh = ar >= 1 ? L / ar : L;
+  const mode = o.mode || pick(['swim', 'hop']);
+  const c = {
+    sprite: sp, dw, dh, mode,
+    x: o.x, y: o.y, heading: rand(0, TAU), target: 0, turnT: 0, edge: false,
+    speed: mode === 'swim' ? rand(38, 64) : rand(80, 115),
+    phase: rand(0, TAU), freq: rand(1.4, 2.2), waves: rand(.7, 1.5),
+    hopT: rand(0, 1), hopRate: rand(.8, 1.1),
+    flip: 1, tilt: 0, age: 0, born: 0, dying: false, dieT: 0,
+    vx: 0, vy: 0
+  };
+  c.target = c.heading;
+  creatures.push(c);
+  return c;
+}
+
+const alive = () => creatures.filter(c => !c.dying);
+
+// 一番古い（age が最大の）個体を消す
+function evictOldest() {
+  let old = null;
+  for (const c of creatures) if (!c.dying && (!old || c.age > old.age)) old = c;
+  if (old) old.dying = true;
+}
+
+function addVisitorCreature(sprite) {
+  const my = (areaTop + areaBottom) / 2;
+  addCreature({ sprite, size: rand(...CFG.sizeRange), x: CX + rand(-30, 30), y: my + rand(-30, 30) });
+  while (alive().length > CFG.maxCreatures) evictOldest();
+  burst(CX, my, 40, 280 * K);
+}
+
+function update(c, dt, t) {
+  c.age += dt; c.born += dt;
+  if (c.dying) { c.dieT += dt; return; }
+
+  // 向きの変更（ときどき気まぐれに曲がる）
+  c.turnT -= dt;
+  if (c.turnT <= 0) { c.target = c.heading + rand(-1.4, 1.4); c.turnT = rand(1.5, 4); }
+
+  // 画面の端に近づいたら中央側へ向かう
+  const xMin = c.dw * .5, xMax = W - c.dw * .5;
+  const yMin = areaTop + c.dh * .6, yMax = areaBottom - c.dh * .5;
+  const near = c.x < xMin + 50 || c.x > xMax - 50 || c.y < yMin + 30 || c.y > yMax - 30;
+  if (near && !c.edge) { c.edge = true; c.target = Math.atan2((yMin + yMax) / 2 - c.y, CX - c.x) + rand(-.4, .4); c.turnT = 1.5; }
+  else if (!near) c.edge = false;
+
+  let diff = c.target - c.heading;
+  diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  c.heading += diff * Math.min(1, dt * 1.8);
+
+  // 速度
+  let sp;
+  if (c.mode === 'swim') sp = c.speed * (.75 + .25 * Math.sin(t * c.freq * 2 + c.phase));
+  else {
+    c.hopT += dt * c.hopRate;
+    const p = c.hopT % 1;
+    sp = p < .55 ? c.speed * Math.sin(p / .55 * Math.PI) : 0;
+  }
+  c.vx = Math.cos(c.heading) * sp;
+  c.vy = Math.sin(c.heading) * sp * .55;   // 縦方向は少し控えめに
+  c.x += c.vx * dt; c.y += c.vy * dt;
+
+  // 画面の外に出ないよう戻す（上のデモテキストと下のボタンにも重ならない）
+  c.x = Math.min(Math.max(c.x, xMin), Math.max(xMin, xMax));
+  if (c.y < yMin) { c.y = yMin; c.target = Math.atan2(Math.abs(Math.sin(c.heading)) + .3, Math.cos(c.heading)); }
+  if (c.y > yMax) { c.y = yMax; c.target = Math.atan2(-Math.abs(Math.sin(c.heading)) - .3, Math.cos(c.heading)); }
+
+  // 左右反転（なめらかに）
+  const face = Math.cos(c.heading);
+  const ft = face >= 0 ? 1 : -1;
+  if (Math.abs(face) > .15) c.flip += (ft - c.flip) * Math.min(1, dt * 8);
+
+  // 傾き
+  const want = c.mode === 'swim' ? Math.atan2(c.vy, Math.abs(c.vx) + 1) * .45 : 0;
+  c.tilt += (want - c.tilt) * Math.min(1, dt * 5);
+}
+
+function draw(c, t) {
+  let sc = easeOutBack(Math.min(1, c.born / .9));
+  let alpha = 1;
+  if (c.dying) { const k = Math.min(1, c.dieT / .8); sc *= 1 - k; alpha = 1 - k; }
+  if (sc <= 0.01) return;
+
+  let sx = 1, sy = 1, yoff = 0, rot = Math.sign(c.flip || 1) * c.tilt, amp;
+  if (c.mode === 'swim') {
+    sy = 1 + Math.sin(t * c.freq * 2 + c.phase) * .03;
+    amp = c.dh * .07;
+  } else {
+    const p = c.hopT % 1;
+    amp = c.dh * .025;
+    if (p < .55) {
+      const h = Math.sin(p / .55 * Math.PI);
+      yoff = -h * c.dh * .55; sy = 1 + h * .06; sx = 1 - h * .04;
+      rot = Math.sign(c.flip || 1) * Math.sin(p / .55 * Math.PI * 2) * .08;
+    } else {
+      const v = (p - .55) / .45, q = Math.sin(v * Math.PI) * (1 - v * .3);
+      sy = 1 - q * .16; sx = 1 + q * .1;
+    }
+  }
+  // 着地のつぶれは足元を基準にする
+  const ground = c.mode === 'hop' ? (c.dh * sc / 2) * (1 - sy) : 0;
+
+  const N = Math.max(10, Math.round(c.dw / 5));
+  const sw = c.sprite.width, sh = c.sprite.height;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.translate(c.x, c.y + yoff + ground);
+  ctx.rotate(rot);
+  ctx.scale(c.flip * sc * sx, sc * sy);
+  const ph = t * c.freq * 2 + c.phase;
+  for (let i = 0; i < N; i++) {
+    const s0 = Math.floor(i * sw / N), s1 = Math.floor((i + 1) * sw / N);
+    if (s1 <= s0) continue;
+    const u = i / N;
+    const off = Math.sin(ph + u * c.waves * TAU) * amp * (.3 + .7 * (1 - u)); // しっぽ側ほど大きく揺れる
+    const dx = -c.dw / 2 + (s0 / sw) * c.dw, w = ((s1 - s0) / sw) * c.dw;
+    ctx.drawImage(c.sprite, s0, 0, s1 - s0, sh, dx, -c.dh / 2 + off, w + .75, c.dh);
+  }
+  ctx.restore();
+}
+
+/* =====================================================
+   背景・描画ループ
+   ===================================================== */
+const HUE_DIFF = 45;   // 最上部と最下部の色相の差（度）
+const HUE_SPEED = 9;   // 色相が回る速さ（度/秒）。9 なら40秒で一周
+
+
+let last = performance.now(), T = 0;
+function frame(now) {
+  const dt = Math.min(.05, (now - last) / 1000); last = now; T += dt;
+
+  const h = (T * HUE_SPEED) % 360;
+  const gr = ctx.createLinearGradient(0, 0, 0, H);
+  gr.addColorStop(0, `hsl(${h},75%,86%)`);
+  gr.addColorStop(1, `hsl(${h + HUE_DIFF},75%,86%)`);   // 最下部は最上部より色相+HUE_DIFF度
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+
+  for (const c of creatures.slice()) update(c, dt, T);
+  for (let i = creatures.length - 1; i >= 0; i--) if (creatures[i].dying && creatures[i].dieT >= .8) creatures.splice(i, 1);
+
+  creatures.sort((a, b) => a.y - b.y);
+  for (const c of creatures) draw(c, T);
+
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i]; r.t += dt;
+    if (r.t >= r.max) { rings.splice(i, 1); continue; }
+    const k = r.t / r.max;
+    ctx.strokeStyle = `rgba(255,255,255,${(1 - k) * .9})`; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.arc(r.x, r.y, r.R * easeOut(k), 0, TAU); ctx.stroke();
+  }
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const p = parts[i]; p.life += dt;
+    if (p.life >= p.max) { parts.splice(i, 1); continue; }
+    const damp = Math.pow(.15, dt); p.vx *= damp; p.vy *= damp; p.x += p.vx * dt; p.y += p.vy * dt;
+    ctx.fillStyle = `hsla(${p.h},90%,62%,${1 - p.life / p.max})`;
+    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, TAU); ctx.fill();
+  }
+
+  if (overlayOpen && performance.now() - lastAct > CFG.idleCloseSec * 1000) closeOverlay(true);
+  requestAnimationFrame(frame);
+}
+
+/* =====================================================
+   描画パネル
+   ===================================================== */
+const overlay = document.getElementById('overlay');
+const paper = document.getElementById('paper');
+const pg = paper.getContext('2d');
+const msg = document.getElementById('msg');
+const COLORS = ['#ff5a5f', '#ffa93a', '#ffe14d', '#5fe38a', '#4dc3ff', '#b07bff', '#ff8fd0', '#ffffff'];
+const SIZES = [6, 13, 24];
+const cur = { color: COLORS[4], size: SIZES[1] };
+let strokes = [], drawing = null, overlayOpen = false, lastAct = 0, msgTimer = 0;
+const touch = () => { lastAct = performance.now(); };
+
+COLORS.forEach(col => {
+  const b = document.createElement('button');
+  b.className = 'sw' + (col === cur.color ? ' sel' : ''); b.style.background = col;
+  b.onclick = () => { cur.color = col; touch(); document.querySelectorAll('.sw').forEach(x => x.classList.toggle('sel', x === b)); };
+  document.getElementById('palette').appendChild(b);
+});
+SIZES.forEach((s, i) => {
+  const b = document.createElement('button');
+  b.className = 'sz' + (s === cur.size ? ' sel' : '');
+  b.innerHTML = `<i style="width:${6 + i * 9}px;height:${6 + i * 9}px"></i>`;
+  b.onclick = () => { cur.size = s; touch(); document.querySelectorAll('.sz').forEach(x => x.classList.toggle('sel', x === b)); };
+  document.getElementById('sizes').appendChild(b);
+});
+
+function toast(text) {
+  msg.textContent = text; msg.classList.add('show');
+  clearTimeout(msgTimer); msgTimer = setTimeout(() => msg.classList.remove('show'), 1800);
+}
+
+function redraw() {
+  pg.clearRect(0, 0, 560, 560); pg.lineCap = 'round'; pg.lineJoin = 'round';
+  for (const s of strokes) {
+    pg.strokeStyle = s.color; pg.fillStyle = s.color; pg.lineWidth = s.size;
+    const p = s.pts;
+    if (p.length === 1) { pg.beginPath(); pg.arc(p[0].x, p[0].y, s.size / 2, 0, TAU); pg.fill(); continue; }
+    pg.beginPath(); pg.moveTo(p[0].x, p[0].y);
+    for (let i = 1; i < p.length - 1; i++) pg.quadraticCurveTo(p[i].x, p[i].y, (p[i].x + p[i + 1].x) / 2, (p[i].y + p[i + 1].y) / 2);
+    const l = p[p.length - 1]; pg.lineTo(l.x, l.y); pg.stroke();
+  }
+}
+
+// ステージが拡縮されていても正しい座標になるよう、表示サイズとの比率で換算
+function pt(e) {
+  const r = paper.getBoundingClientRect();
+  return { x: (e.clientX - r.left) * paper.width / r.width, y: (e.clientY - r.top) * paper.height / r.height };
+}
+paper.addEventListener('pointerdown', e => {
+  if (drawing) return;
+  e.preventDefault(); paper.setPointerCapture(e.pointerId);
+  const s = { color: cur.color, size: cur.size, pts: [pt(e)] };
+  strokes.push(s); drawing = { id: e.pointerId, s }; touch(); redraw();
+});
+paper.addEventListener('pointermove', e => {
+  if (!drawing || e.pointerId !== drawing.id) return;
+  const p = pt(e), l = drawing.s.pts[drawing.s.pts.length - 1];
+  if (Math.hypot(p.x - l.x, p.y - l.y) < 1.5) return;
+  drawing.s.pts.push(p); touch(); redraw();
+});
+const endStroke = e => { if (drawing && e.pointerId === drawing.id) drawing = null; };
+paper.addEventListener('pointerup', endStroke);
+paper.addEventListener('pointercancel', endStroke);
+
+function openOverlay() { strokes = []; redraw(); overlayOpen = true; touch(); overlay.classList.remove('hidden'); stage.classList.add('drawing'); }
+function closeOverlay(clear) { overlayOpen = false; overlay.classList.add('hidden'); stage.classList.remove('drawing'); drawing = null; if (clear) { strokes = []; redraw(); } }
+
+document.getElementById('openBtn').onclick = openOverlay;
+document.getElementById('closeBtn').onclick = () => closeOverlay(true);
+document.getElementById('undo').onclick = () => { strokes.pop(); touch(); redraw(); };
+document.getElementById('clear').onclick = () => { strokes = []; touch(); redraw(); };
+document.getElementById('born').onclick = () => {
+  if (!strokes.length) { toast('まず絵を描いてね'); return; }
+  const sprite = spriteFromCanvas(paper);
+  if (!sprite) { toast('まず絵を描いてね'); return; }
+  if (sprite.tooSmall) { toast('もう少し大きく描いてね'); return; }
+  addVisitorCreature(sprite);
+  closeOverlay(true);
+};
+
+addEventListener('contextmenu', e => e.preventDefault());
+addEventListener('keydown', e => {
+  if (e.key === 'f') (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen()).catch(() => {});
+});
+
+/* ---------- 起動：デモ用の初期個体を3体 ---------- */
+[[0, .32, .3], [1, .68, .5], [2, .5, .75]].forEach(([k, fx, fy]) => {
+  const sp = seedSprite(k);
+  addCreature({ sprite: sp, size: rand(...CFG.sizeRange), x: W * fx, y: areaTop + (areaBottom - areaTop) * fy, mode: k === 1 ? 'swim' : (k === 0 ? 'hop' : 'swim') });
+});
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

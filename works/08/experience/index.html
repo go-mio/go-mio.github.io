@@ -1,0 +1,1117 @@
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>もし地球が水星の位置にあったら…？</title>
+<script>
+  (function(d) {
+    var config = {
+      kitId: 'xeu6bne',
+      scriptTimeout: 3000,
+      async: true
+    },
+    h=d.documentElement,t=setTimeout(function(){h.className=h.className.replace(/\bwf-loading\b/g,"")+" wf-inactive";},config.scriptTimeout),tk=d.createElement("script"),f=false,s=d.getElementsByTagName("script")[0],a;h.className+=" wf-loading";tk.src='https://use.typekit.net/'+config.kitId+'.js';tk.async=true;tk.onload=tk.onreadystatechange=function(){a=this.readyState;if(f||a&&a!="complete"&&a!="loaded")return;f=true;clearTimeout(t);try{Typekit.load(config)}catch(e){}};s.parentNode.insertBefore(tk,s)
+  })(document);
+</script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<!-- 予備のフォント。ab-omusubi が読み込めない環境(オフラインなど)でだけ使われる -->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@400;500&display=swap">
+<style>
+/* Layout: one wide wall (2:1) holding two circular panels side by side.
+   Left  = orbit diagram (no text): circles concentric with the display, touch ring on the outer band.
+   Right = Earth only + commentary + three soft cards (length of year, temperature, chance of life in %).
+   Look: deep indigo night, pastel accents, bubbly rounded cards. One font everywhere (ab-omusubi, 400).
+   To swap the sides, swap the two <section class="panel"> blocks in the HTML. */
+:root {
+  color-scheme: dark;
+  --void: #000000;
+  --space: #17143f;
+  --ink: #fff8fc;
+  --dim: #d6cff2;
+  --cool: #9bdcff;
+  --accent: #9bdcff;
+  --card: rgba(255, 255, 255, 0.13);
+  --card-year: rgba(155, 220, 255, 0.20);
+  --card-temp: rgba(255, 170, 130, 0.22);
+  --card-life: rgba(140, 235, 180, 0.20);
+  --line: rgba(255, 255, 255, 0.30);
+  --font: "ab-omusubi", "Zen Maru Gothic", sans-serif;
+  --gutter: 0px;
+  --h: min(calc((100vw - 2 * var(--gutter)) / 2), 100vh);
+}
+@media (max-width: 600px) { :root { --gutter: 16px; } }
+
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font);
+  font-weight: 400;
+  font-style: normal;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+h1, h2, p, span { font-family: var(--font); font-weight: 400; font-style: normal; }
+p.desc { font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif; font-weight: 500; }
+
+.wall { width: calc(2 * var(--h)); height: var(--h); display: flex; }
+
+.panel {
+  position: relative;
+  flex: none;
+  width: var(--h);
+  height: var(--h);
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--space);
+  container-type: size;
+  touch-action: none;
+  outline: none;
+}
+#panel-orbit { cursor: grab; }
+#panel-orbit.grabbing { cursor: grabbing; }
+#panel-orbit:focus-visible { outline: 3px solid var(--cool); outline-offset: -6px; }
+
+canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+.top {
+  position: absolute;
+  left: 50%;
+  top: 10.4%;
+  width: 66%;
+  box-sizing: border-box;
+  padding: 1.5cqw 3cqw 1.9cqw;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9cqw;
+  text-align: center;
+  text-shadow: 0 0 1.4cqw rgba(16, 14, 48, 0.95), 0 0.2cqw 0.8cqw rgba(16, 14, 48, 0.9);
+  pointer-events: none;
+  transition: opacity 0.22s ease, transform 0.22s ease;
+}
+.top.swap { opacity: 0; transform: translateX(-50%) translateY(0.6cqw); }
+
+.title {
+  margin: 0;
+  font-size: 4.6cqw;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  text-wrap: balance;
+}
+.desc {
+  margin: 0;
+  /* 説明文だけ、読みやすさを優先して丸ゴシック体にする */
+  font-family: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Yu Gothic", sans-serif;
+  font-weight: 500;
+  font-size: 2.4cqw;
+  line-height: 1.75;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+
+.readouts {
+  position: absolute;
+  left: 50%;
+  top: 68.5%;
+  width: 76%;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1.4cqw;
+  pointer-events: none;
+}
+.ro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.6cqw;
+  min-width: 0;
+  padding: 0.6cqw 0.6cqw;
+  text-shadow: 0 0 1.2cqw rgba(16, 14, 48, 0.95), 0 0.2cqw 0.6cqw rgba(16, 14, 48, 0.9);
+}
+.lbl { font-size: 2cqw; letter-spacing: 0.05em; white-space: nowrap; color: var(--dim); }
+/* 数字は日本語(単位)より大きくそろえる */
+.val {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2cqw;
+  font-size: 3.8cqw;
+  line-height: 1.1;
+  white-space: nowrap;
+  color: var(--ink);
+}
+.val .num { font-size: 7.8cqw; line-height: 1; letter-spacing: 0.01em; }
+#val-year { color: #bfe8ff; }
+#val-temp { color: #ffc9a8; }
+.sub { display: flex; flex-direction: column; align-items: center; gap: 0.3cqw; white-space: nowrap; }
+.sub-max, .sub-min { display: inline-flex; align-items: baseline; gap: 0.6cqw; font-size: 2.1cqw; line-height: 1.15; letter-spacing: 0.03em; }
+.sub-max .n, .sub-min .n { font-size: 4.8cqw; line-height: 1; letter-spacing: 0.01em; }
+.sub-max { color: #ffb59a; }
+.sub-min { color: #a8dcff; }
+.val--life { color: var(--life-c, #8ef0b8); }
+.meter { width: 78%; height: 1cqw; border-radius: 1cqw; background: rgba(255, 255, 255, 0.2); overflow: hidden; }
+.meter i {
+  display: block;
+  height: 100%;
+  width: var(--life-w, 100%);
+  background: var(--life-c, #8ef0b8);
+  border-radius: inherit;
+  transition: width 0.25s ease;
+}
+
+.desc .mio { font-family: inherit; font-weight: inherit; color: #ffd9b8; }
+
+/* ---- タイトル画面 (はじめるを押すまで) ---- */
+.intro-ui {
+  position: absolute;
+  left: 50%;
+  box-sizing: border-box;
+  text-align: center;
+  text-shadow: 0 0 1.6cqw rgba(16, 14, 48, 0.95), 0 0.2cqw 0.8cqw rgba(16, 14, 48, 0.9);
+  transition: opacity 0.7s ease;
+}
+.wall:not(.intro) .intro-ui {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.6s ease, visibility 0s linear 0.6s;
+}
+.intro-earth { top: 12%; width: 78%; transform: translateX(-50%); pointer-events: none; }
+.intro-title { margin: 0; font-size: 6.6cqw; line-height: 1.3; letter-spacing: 0.05em; color: #fff; text-wrap: balance; }
+.intro-title .em, .intro-lead .em { color: #ffc9a8; }
+.intro-orbit {
+  top: 50%;
+  width: 60%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4.5cqw;
+}
+/* 中央の軌道図が文字のじゃまにならないよう、やわらかく薄くする */
+.intro-orbit::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  left: 50%;
+  top: 50%;
+  width: 82cqw;
+  height: 82cqw;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(23, 20, 63, 0.94) 0 70%, rgba(23, 20, 63, 0) 100%);
+}
+.intro-lead { margin: 0; font-size: 4cqw; line-height: 1.65; letter-spacing: 0.03em; white-space: nowrap; color: var(--ink); }
+.start {
+  font-family: var(--font);
+  font-weight: 400;
+  font-size: 5cqw;
+  letter-spacing: 0.12em;
+  color: #4a2150;
+  padding: 1.8cqw 9cqw 2cqw;
+  border: none;
+  border-radius: 99cqw;
+  background: #ffc9a8;
+  box-shadow: 0 1cqw 2.4cqw rgba(8, 6, 30, 0.4);
+  text-shadow: none;
+  cursor: pointer;
+  animation: pop 2.4s ease-in-out infinite;
+}
+.start:active { transform: scale(0.95); animation: none; }
+.start:focus-visible { outline: 0.6cqw solid #fff; outline-offset: 0.8cqw; }
+@keyframes pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+
+/* ---- 地球の右がわ: 「〇〇が溶ける」 ---- */
+.melt {
+  position: absolute;
+  left: 82.5%;
+  top: 50%;
+  width: 27%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3cqw;
+  text-align: center;
+  line-height: 1.2;
+  text-shadow: 0 0 1.2cqw rgba(16, 14, 48, 0.95), 0 0.2cqw 0.6cqw rgba(16, 14, 48, 0.9);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.melt.hide { opacity: 0; transform: translate(-50%, -46%); }
+.melt-icon { width: 11cqw; height: 11cqw; filter: drop-shadow(0 0.6cqw 1cqw rgba(16, 14, 48, 0.5)); }
+.melt-icon svg { display: block; width: 100%; height: 100%; }
+.melt-name { font-size: 3cqw; line-height: 1.2; letter-spacing: 0.03em; white-space: nowrap; color: #ffd9b8; }
+.melt-verb { font-size: 2.5cqw; line-height: 1.2; letter-spacing: 0.06em; color: var(--ink); }
+.melt-temp { display: inline-flex; align-items: baseline; gap: 0.2cqw; font-size: 2cqw; line-height: 1.2; letter-spacing: 0.04em; margin-top: 0.4cqw; color: var(--dim); }
+.melt-temp .n { font-size: 3.6cqw; line-height: 1; letter-spacing: 0.01em; color: var(--ink); }
+
+.wall.intro .top, .wall.intro .readouts, .wall.intro .melt { opacity: 0; }
+.readouts { transition: opacity 0.6s ease; }
+
+@media (max-width: 600px) and (orientation: portrait) {
+  :root { --h: min(calc(100vw - 32px), calc((100vh - 24px) / 2)); }
+  .wall { width: var(--h); height: calc(2 * var(--h)); flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .top, .meter i, .melt, .intro-ui { transition: none; }
+  .start { animation: none; }
+}
+</style>
+
+<main class="wall intro" id="wall">
+  <section class="panel" id="panel-orbit" tabindex="0" aria-label="太陽と地球の距離を表す軌道図。ふちを回すか、矢印キーで距離を変えられます。">
+    <canvas id="view-orbit" width="2000" height="2000"></canvas>
+    <div class="intro-ui intro-orbit" id="intro-orbit">
+      <p class="intro-lead">この画面の端を<br><span class="em">ぐるぐる回して</span>、<br>水星の軌道に近づいてみよう</p>
+      <button class="start" id="start" type="button">はじめる</button>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-earth" aria-label="いまの地球の様子">
+    <canvas id="view-earth" width="2000" height="2000"></canvas>
+    <div class="intro-ui intro-earth" id="intro-earth">
+      <h1 class="intro-title">もし<span class="em">水星の距離</span>に<br>地球があったら？</h1>
+    </div>
+    <div class="top" id="e-top">
+      <h2 class="title" id="e-title">いまの地球</h2>
+      <p class="desc" id="e-desc" aria-live="polite">海と大気があり、液体の水がある。生命が暮らせる環境だ。もう一方の画面のふちを回すと、地球が太陽へ近づく。</p>
+    </div>
+    <div class="melt hide" id="melt" aria-live="polite">
+      <div class="melt-icon" id="melt-icon"></div>
+      <div class="melt-name" id="melt-name"></div>
+      <div class="melt-verb">が溶ける</div>
+      <div class="melt-temp" id="melt-temp"></div>
+    </div>
+    <div class="readouts" id="readouts">
+      <div class="ro ro--year"><span class="lbl">1年の長さ</span><span class="val" id="val-year"><span class="num">12</span><span>ヶ月</span></span></div>
+      <div class="ro ro--temp"><span class="lbl">地表温度（平均）</span><span class="val" id="val-temp"><span class="num">8</span><span>℃</span></span><span class="sub"><span class="sub-max" id="val-max"><span>最高</span><span class="n">25</span><span>℃</span></span><span class="sub-min" id="val-min"><span>北極・南極</span><span class="n">-60</span><span>℃</span></span></span></div>
+      <div class="ro ro--life"><span class="lbl">生命の可能性</span><span class="val val--life" id="val-life"><span class="num">90.7</span><span>%</span></span><span class="meter"><i></i></span></div>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= 設定 ================= */
+const TURNS = 30;             // ふちを何周すると 1 AU から水星の軌道まで進むか
+const MERC = 0.387, VENUS = 0.723;  // 水星・金星の軌道 (AU)
+const D_MIN = MERC;           // いちばん近い距離 = 水星の軌道
+const MAX_CANVAS = 2000;      // 1画面あたりの描画解像度の上限(px)。重いときは小さくする
+const EARTH_RES = 448;        // 地球を描く解像度
+const TW = 640, TH = 320;     // 地表テクスチャのサイズ
+const SPIN_SPEED = 0.22;      // 地球の自転 (rad/秒)
+const ORBIT_SPEED = 0.18;     // 軌道図で 1 AU の星が回る速さ (rad/秒)
+const IDLE_RESET_SEC = 75;    // 誰も触れない時間がこれを超えると 1 AU に戻る
+
+// 軌道図: 円はすべて画面の中心と同心。パネル一辺を 1 とした比率
+const R_IN = 0.10, R_OUT = 0.34;    // 水星の軌道(最接近)と 1 AU の軌道の半径
+const R_EDGE = 0.40;                // ふちの帯のすぐ内側
+// 地球パネル
+const EX = 0.5, EY = 0.5, ER = 0.145;
+
+const REDUCED = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+const TAU = Math.PI * 2;
+
+/* ================= 地球側の解説の段階 ================= */
+const STAGES = [
+  { min: 0.96, title: 'いまの地球',
+    desc: '海と大気があり、液体の水がある。生命が暮らせる環境だ。もう一方の画面のふちを回すと、地球が太陽へ近づく。' },
+  { min: 0.84, title: '生命が暮らしにくくなる',
+    desc: '気温が上がり、海の水が蒸発しはじめる。生命が暮らせる可能性は、急に下がっていく。' },
+  { min: 0.76, title: '暴走温室効果',
+    desc: '水蒸気が熱を閉じ込め、気温が止まらずに上がっていく。空が雲でおおわれていく。' },
+  { min: 0.64, title: '金星の距離',
+    desc: '金星と同じ、約0.72 AUの軌道。北極と南極のほかは、星ぜんたいが白い雲におおわれる。' },
+  { min: 0.56, title: '真っ白な星',
+    desc: '星ぜんたいが真っ白な雲におおわれて、地表はもう見えない。' },
+  { min: 0.44, title: '雲がほどけていく',
+    desc: '熱で雲がほどけて、焦げた大地があらわれてくる。' },
+  { min: 0.392, title: '赤熱する地表',
+    desc: '岩石が赤く焼け、ひび割れの奥が光りはじめる。生命が生き残れる場所は、もうない。' },
+  { min: 0,    title: '水星の距離に到着！',
+    desc: '水星と同じ軌道。最高360℃、いちばん涼しい北極・南極でも180℃。<br><span class="mio">水星探査機「みお」は、<br>この暑さの中で調査をおこなう。</span>' }
+];
+
+/* ================= 地球の上のものが溶けはじめる温度 (地表の「最高温度」がこれを超えたら表示) ================= */
+const MELT = [
+  { at: 0,   name: 'アイスクリーム',   icon: 'ice',    col: '#ffc2dc' },
+  { at: 34,  name: 'チョコレート',     icon: 'choco',  col: '#a8745c' },
+  { at: 60,  name: 'キャンドルのろう', icon: 'candle', col: '#ffe6bd' },
+  { at: 120, name: 'ポリ袋',           icon: 'bag',    col: '#cfdcff' },
+  { at: 190, name: 'はんだ',           icon: 'solder', col: '#cfd6e0' },
+  { at: 255, name: 'ペットボトル',     icon: 'bottle', col: '#a8dcff' },
+  { at: 327, name: '鉛のおもり',       icon: 'lead',   col: '#9aa3b5' }
+];
+const PUDDLE = '<ellipse cx="32" cy="58" rx="22" ry="4" fill="currentColor" opacity=".45"/>';
+const ICONS = {
+  ice: '<svg viewBox="0 0 64 64"><path d="M22 30h20L32 56z" fill="#e8b36a"/><path d="M26 34l6 12M34 34l-6 12M22 30l10 26M42 30L32 56" stroke="#c99245" stroke-width="1.5" fill="none"/><circle cx="32" cy="21" r="12" fill="#ffc2dc"/><rect x="20" y="26" width="7" height="12" rx="3.5" fill="#ffc2dc"/><rect x="37" y="27" width="6" height="8" rx="3" fill="#ffc2dc"/><circle cx="28" cy="17" r="3" fill="#fff" opacity=".45"/>' + PUDDLE + '</svg>',
+  solder: '<svg viewBox="0 0 64 64"><path d="M10 22c10-12 22 6 32-4" stroke="#cfd6e0" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M18 52c0-11 6-17 14-17s14 6 14 17z" fill="#cfd6e0"/><path d="M24 46c2-4 5-6 8-6" stroke="#fff" stroke-width="2" opacity=".6" fill="none" stroke-linecap="round"/>' + PUDDLE + '</svg>',
+  choco: '<svg viewBox="0 0 64 64"><rect x="10" y="8" width="44" height="32" rx="6" fill="#8d5b46"/><path d="M10 19h44M10 29h44M25 8v32M40 8v32" stroke="#6b4232" stroke-width="2" fill="none"/><rect x="13" y="36" width="9" height="15" rx="4.5" fill="#8d5b46"/><rect x="36" y="36" width="9" height="9" rx="4.5" fill="#8d5b46"/>' + PUDDLE + '</svg>',
+  candle: '<svg viewBox="0 0 64 64"><path d="M32 4c6 7 7 11 0 17-7-6-6-10 0-17z" fill="#ffb347"/><path d="M32 12c3 3 3 5 0 8-3-3-3-5 0-8z" fill="#ffe27a"/><rect x="31" y="20" width="2" height="5" fill="#5b4a5e"/><rect x="21" y="24" width="22" height="28" rx="4" fill="#fff0d6"/><rect x="24" y="44" width="6" height="12" rx="3" fill="#fff0d6"/>' + PUDDLE + '</svg>',
+  bag: '<svg viewBox="0 0 64 64"><path d="M22 20c0-10 20-10 20 0" stroke="#dfe9ff" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M16 20h32l3 30c0 4-7 6-19 6s-19-2-19-6z" fill="#e8f0ff" fill-opacity=".55" stroke="#dfe9ff" stroke-width="2"/><path d="M24 30c4 3 12 3 16 0" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/>' + PUDDLE + '</svg>',
+  bottle: '<svg viewBox="0 0 64 64"><rect x="26" y="3" width="12" height="6" rx="2" fill="#7fb8e6"/><path d="M27 9h10v7l7 9v26a4 4 0 0 1-4 4H24a4 4 0 0 1-4-4V25l7-9z" fill="#a8dcff" fill-opacity=".85"/><rect x="21" y="32" width="22" height="10" fill="#fff" fill-opacity=".65"/>' + PUDDLE + '</svg>',
+  lead: '<svg viewBox="0 0 64 64"><circle cx="32" cy="14" r="6" fill="none" stroke="#9aa3b5" stroke-width="3"/><path d="M25 22h14l9 30H16z" fill="#9aa3b5"/><path d="M26 28h6l-5 20h-5z" fill="#fff" opacity=".18"/>' + PUDDLE + '</svg>',
+  can: '<svg viewBox="0 0 64 64"><rect x="19" y="12" width="26" height="42" rx="4" fill="#dce5f0"/><ellipse cx="32" cy="12" rx="13" ry="3.5" fill="#aebccd"/><rect x="19" y="26" width="26" height="12" fill="#8fc7ff"/><rect x="23" y="16" width="4" height="34" rx="2" fill="#fff" opacity=".5"/>' + PUDDLE + '</svg>'
+};
+
+/* ================= 数学ヘルパー ================= */
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (e0, e1, x) => { const t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); };
+const ramp = (d, a, b) => sstep(a, b, d);            // d=a で 0、d=b で 1 (a > b)
+const mix3 = (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
+const tFor = (d) => (1 - d) / (1 - D_MIN);           // 距離 → 進み具合 0..1
+const dFor = (t) => 1 - t * (1 - D_MIN);
+const rOrbit = (d) => R_IN + (R_OUT - R_IN) * (d - MERC) / (1 - MERC);
+
+/* ================= ノイズと地表テクスチャ ================= */
+function hash3(x, y, z) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1440662683);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function noise3(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const x00 = lerp(hash3(xi, yi, zi), hash3(xi + 1, yi, zi), u);
+  const x10 = lerp(hash3(xi, yi + 1, zi), hash3(xi + 1, yi + 1, zi), u);
+  const x01 = lerp(hash3(xi, yi, zi + 1), hash3(xi + 1, yi, zi + 1), u);
+  const x11 = lerp(hash3(xi, yi + 1, zi + 1), hash3(xi + 1, yi + 1, zi + 1), u);
+  return lerp(lerp(x00, x10, v), lerp(x01, x11, v), w);
+}
+function fbm(x, y, z, oct) {
+  let s = 0, a = 0.5, f = 1, n = 0;
+  for (let i = 0; i < oct; i++) { s += a * noise3(x * f, y * f, z * f); n += a; a *= 0.5; f *= 2.03; }
+  return s / n;
+}
+// 値の分布を 0..1 に均す。しきい値が「面積の割合」としてそのまま使える。
+function rankNormalize(a) {
+  const B = 1024, hist = new Uint32Array(B);
+  let mn = Infinity, mx = -Infinity;
+  for (let i = 0; i < a.length; i++) { if (a[i] < mn) mn = a[i]; if (a[i] > mx) mx = a[i]; }
+  const sc = (B - 1) / ((mx - mn) || 1);
+  for (let i = 0; i < a.length; i++) hist[((a[i] - mn) * sc) | 0]++;
+  const cdf = new Float32Array(B);
+  let acc = 0;
+  for (let b = 0; b < B; b++) { acc += hist[b]; cdf[b] = acc / a.length; }
+  for (let i = 0; i < a.length; i++) a[i] = cdf[((a[i] - mn) * sc) | 0];
+}
+function buildTextures() {
+  const n = TW * TH;
+  const land = new Float32Array(n), cloud = new Float32Array(n), crack = new Float32Array(n);
+  for (let j = 0; j < TH; j++) {
+    const lat = (0.5 - (j + 0.5) / TH) * Math.PI;
+    const cl = Math.cos(lat), sl = Math.sin(lat);
+    for (let i = 0; i < TW; i++) {
+      const lon = ((i + 0.5) / TW - 0.5) * TAU;
+      const px = cl * Math.sin(lon), py = sl, pz = cl * Math.cos(lon);
+      const k = j * TW + i;
+      land[k] = fbm(px * 1.5 + 3.1, py * 1.5 + 7.7, pz * 1.5 + 1.3, 5);
+      cloud[k] = fbm(px * 2.4 + 11.0, py * 5.2 + 2.0, pz * 2.4 + 5.0, 5);
+      const r = fbm(px * 3.2 + 21.0, py * 3.2 + 9.0, pz * 3.2 + 4.0, 4);
+      crack[k] = 1 - Math.abs(2 * r - 1);
+    }
+  }
+  rankNormalize(land); rankNormalize(cloud); rankNormalize(crack);
+  return { land, cloud, crack };
+}
+
+/* ================= 地球の球面マッピング(事前計算) ================= */
+const N = EARTH_RES;
+const inside = new Uint8Array(N * N), edgeA = new Uint8Array(N * N);
+const baseU = new Float32Array(N * N), rowI = new Uint16Array(N * N);
+const absLat = new Float32Array(N * N), lit = new Float32Array(N * N);
+const litSoft = new Float32Array(N * N), spec = new Float32Array(N * N), rim = new Float32Array(N * N);
+(function precomputeSphere() {
+  const Lraw = [-0.93, -0.05, 0.36];
+  const Ll = Math.hypot(Lraw[0], Lraw[1], Lraw[2]);
+  const L = Lraw.map((v) => v / Ll);
+  const Hraw = [L[0], L[1], L[2] + 1];
+  const Hl = Math.hypot(Hraw[0], Hraw[1], Hraw[2]);
+  const H = Hraw.map((v) => v / Hl);
+  const tilt = 0.41, ct = Math.cos(tilt), st = Math.sin(tilt);
+  for (let j = 0; j < N; j++) {
+    for (let i = 0; i < N; i++) {
+      const p = j * N + i;
+      const x = ((i + 0.5) / N) * 2 - 1, y = ((j + 0.5) / N) * 2 - 1;
+      const r2 = x * x + y * y;
+      if (r2 >= 1) continue;
+      inside[p] = 1;
+      edgeA[p] = Math.round(clamp((1 - Math.sqrt(r2)) * (N / 2), 0, 1) * 255);
+      const nx = x, ny = -y, nz = Math.sqrt(1 - r2);
+      const bx = nx * ct + ny * st, by = -nx * st + ny * ct, bz = nz;
+      const lat = Math.asin(clamp(by, -1, 1)), lon = Math.atan2(bx, bz);
+      baseU[p] = (lon / TAU + 0.5) * TW;
+      rowI[p] = clamp(Math.floor((0.5 - lat / Math.PI) * TH), 0, TH - 1);
+      absLat[p] = Math.abs(lat) / (Math.PI / 2);
+      const dl = nx * L[0] + ny * L[1] + nz * L[2];
+      lit[p] = Math.max(0, dl);
+      litSoft[p] = clamp(dl + 0.25, 0, 1);
+      spec[p] = Math.pow(Math.max(0, nx * H[0] + ny * H[1] + nz * H[2]), 48);
+      rim[p] = Math.pow(1 - nz, 2.6);
+    }
+  }
+})();
+
+/* ================= Universe Sandbox で測ったデータ ================= */
+// [距離(AU), 1年の長さ(か月), 最高温度(℃), 平均温度(℃), 北極・南極の温度(℃), 生命の可能性(%)]
+// ※5つ目は地表全体の最低ではなく、北極・南極(いちばん涼しい場所)の値
+// null は測れていない値で、前後の行から直線で補う
+const DATA = [
+  [1.0,  12,   25,  8,    -60,  90.7],
+  [0.9,  10.3, 55,  37.5, -50,  77.5],
+  [0.8,  8.66, 80,  59,   -37,  68],
+  [0.7,  7.1,  100, 83,   0,    58],     // 北極・南極以外の全てが白くなる
+  [0.6,  5.64, 150, null, 40,   1.23],   // 全てが白くなる
+  [0.5,  4.3,  260, 160,  110,  0.65],
+  [0.4,  3.0,  320, 309,  143,  0.31],
+  [0.39, 2.98, 360, 320,  180,  0.24]
+];
+for (let c = 1; c < 6; c++) {
+  for (let r = 0; r < DATA.length; r++) {
+    if (DATA[r][c] !== null) continue;
+    let a = r - 1, b = r + 1;
+    while (a >= 0 && DATA[a][c] === null) a--;
+    while (b < DATA.length && DATA[b][c] === null) b++;
+    DATA[r][c] = lerp(DATA[a][c], DATA[b][c], (DATA[r][0] - DATA[a][0]) / (DATA[b][0] - DATA[a][0]));
+  }
+}
+// 距離 d の値を、表の前後の行から直線でつなぐ (表の範囲の外は端の行の値)
+function sample(d) {
+  const n = DATA.length;
+  let row;
+  if (d >= DATA[0][0]) row = DATA[0];
+  else if (d <= DATA[n - 1][0]) row = DATA[n - 1];
+  else {
+    let i = 0;
+    while (d < DATA[i + 1][0]) i++;
+    const a = DATA[i], b = DATA[i + 1], k = (a[0] - d) / (a[0] - b[0]);
+    row = a.map((v, j) => lerp(v, b[j], k));
+  }
+  return { months: row[1], max: row[2], mean: row[3], min: row[4], life: row[5] };
+}
+
+/* ================= 距離から地球の状態を決める ================= */
+function earthState(d) {
+  const dry = ramp(d, 0.96, 0.74);        // 海が失われる
+  const warm = ramp(d, 0.98, 0.84);       // 湿った大気・雲の増加
+  const venus = ramp(d, 0.90, 0.72) * 0.25; // 雲は白のまま、ほんの少しだけ黄みを足す
+  const burn = ramp(d, 0.58, 0.40);       // 雲が焼けて薄れる (0.6 AU までは星ぜんたいが白い)
+  const charA = ramp(d, 0.60, 0.42);      // 地表が焦げる
+  const heat = ramp(d, 0.50, 0.39) * 0.85; // ひび割れの赤熱
+  const veg = 1 - ramp(d, 0.995, 0.86);   // 緑
+  const dull = ramp(d, 0.52, 0.42) * 0.45;
+  // 0.7 AU 付近は、北極・南極だけ白い雲におおわれない
+  const pole = sstep(0.6, 0.68, d) * (1 - sstep(0.74, 0.84, d));
+  const cover = lerp(0.36, 1.0, warm) * (1 - burn * 0.97);
+  const soft = 0.09;
+  return {
+    landFrac: lerp(0.30, 1.0, dry),
+    ice: 1 - ramp(d, 0.995, 0.95),
+    oD: mix3([10, 44, 112], [44, 96, 116], warm * 0.6),
+    oS: mix3([38, 118, 170], [96, 150, 150], warm * 0.6),
+    lLo: mix3(mix3([150, 118, 78], [44, 108, 56], veg), [58, 44, 38], charA * 0.92),
+    lHi: mix3(mix3([205, 170, 120], [128, 148, 86], veg), [96, 74, 60], charA * 0.92),
+    heat, dull, soft, pole,
+    cloudA: (1 - cover) * (1 + 2 * soft) - soft,
+    cloudOp: 0.93,
+    cloudC: mix3(mix3([252, 252, 254], [236, 210, 148], venus), [150, 100, 62], burn),
+    rimC: mix3(mix3([110, 170, 255], [255, 226, 160], venus), [255, 120, 50], burn),
+    atmo: 1 - ramp(d, 0.55, MERC) * 0.55,
+    gain: 1 + 0.55 * (1 - d) / (1 - MERC)
+  };
+}
+function accentRGB(d) {
+  const a1 = ramp(d, 0.97, 0.88), a2 = ramp(d, 0.86, 0.60), a3 = ramp(d, 0.58, 0.40);
+  return mix3(mix3(mix3([155, 220, 255], [255, 224, 140], a1), [255, 170, 120], a2), [255, 125, 120], a3);
+}
+const rgbStr = (c) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+// 軌道図の地球の点の色 (青 → 乾いた茶色 → 赤熱)
+function dotRGB(d) {
+  return mix3(mix3([70, 140, 230], [200, 170, 110], ramp(d, 0.97, 0.78)), [255, 110, 30], ramp(d, 0.62, 0.42));
+}
+// 生命の可能性 (表の値。v は % で、L はそれを 0〜1 にしたもの。色の目安にも使う)
+function lifeInfo(d) {
+  const v = sample(d).life, L = v / 100;
+  if (L > 0.85) return { L, v, col: '#8ef0b8' };
+  if (L > 0.35) return { L, v, col: '#ffe27a' };
+  if (L > 0.03) return { L, v, col: '#ffab76' };
+  return { L, v, col: '#ff8fa3' };
+}
+// 数字の見せ方: 大きい値は整数、小さい値は小数点以下を増やす
+function fmtPct(v) { return v >= 1 ? v.toFixed(1) : v.toFixed(2); }
+
+/* ================= パネルの準備 ================= */
+function makePanel(pid, cid) {
+  const el = document.getElementById(pid);
+  const canvas = document.getElementById(cid);
+  return { el, canvas, ctx: canvas.getContext('2d'), S: 0, stars: null };
+}
+const ORB = makePanel('panel-orbit', 'view-orbit');
+const EAR = makePanel('panel-earth', 'view-earth');
+const wall = document.getElementById('wall');
+
+// やわらかい藍色の夜空
+function paintBG(ctx, S) {
+  const g = ctx.createRadialGradient(S * 0.5, S * 0.42, 0, S * 0.5, S * 0.5, S * 0.72);
+  g.addColorStop(0, '#2d2768');
+  g.addColorStop(0.6, '#1c1848');
+  g.addColorStop(1, '#100e30');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+}
+function buildStars(S) {
+  const c = document.createElement('canvas');
+  c.width = c.height = S;
+  const sc = c.getContext('2d');
+  let seed = 12345;
+  const rnd = () => ((seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0) / 4294967296);
+  for (let i = 0; i < 520; i++) {
+    const x = rnd() * S, y = rnd() * S, m = rnd();
+    const r = (0.4 + m * m * 1.6) * (S / 2000) * 1.4;
+    const a = 0.25 + 0.7 * rnd();
+    const k = rnd();
+    const col = k < 0.2 ? '255,220,190' : k < 0.5 ? '190,215,255' : '255,255,255';
+    sc.fillStyle = `rgba(${col},${a.toFixed(2)})`;
+    sc.beginPath(); sc.arc(x, y, r, 0, TAU); sc.fill();
+  }
+  return c;
+}
+function resizePanel(P) {
+  const w = P.el.clientWidth || 1000;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const s = Math.max(300, Math.min(MAX_CANVAS, Math.round(w * dpr)));
+  if (s === P.S) return;
+  P.S = s; P.canvas.width = s; P.canvas.height = s;
+  P.stars = buildStars(s);
+}
+function resizeAll() { resizePanel(ORB); resizePanel(EAR); }
+resizeAll();
+if (window.ResizeObserver) { const ro = new ResizeObserver(resizeAll); ro.observe(ORB.el); ro.observe(EAR.el); }
+else window.addEventListener('resize', resizeAll);
+
+const ec = document.createElement('canvas');
+ec.width = ec.height = N;
+const ectx = ec.getContext('2d');
+const img = ectx.createImageData(N, N);
+const TEX = buildTextures();
+
+/* ================= 地球を描く ================= */
+function renderEarth(st, spinTex, cloudTex) {
+  const land = TEX.land, cloud = TEX.cloud, crack = TEX.crack, out = img.data;
+  const th = 1 - st.landFrac, soft = st.soft;
+  const oD = st.oD, oS = st.oS, lLo = st.lLo, lHi = st.lHi, cc = st.cloudC, rc = st.rimC;
+  const heat = st.heat, dull = st.dull, gain = st.gain, atmo = st.atmo, ice = st.ice;
+  const ca0 = st.cloudA, cOp = st.cloudOp, pole = st.pole;
+  const useIce = ice > 0.01, useHeat = heat > 0.001 || dull > 0.001;
+  const lavaX0 = 1 - heat * 1.24;
+  for (let p = 0, n = N * N; p < n; p++) {
+    const o = p * 4;
+    if (!inside[p]) { out[o + 3] = 0; continue; }
+    const row = rowI[p] * TW;
+    const ti = row + (((baseU[p] + spinTex) | 0) % TW);
+    const ci = row + (((baseU[p] + cloudTex) | 0) % TW);
+    const rk = land[ti];
+    const la = sstep(th - 0.012, th + 0.012, rk);
+    const sh = sstep(th - 0.22, th, rk);
+    const hv = sstep(th, 1, rk);
+    let r = lerp(lerp(oD[0], oS[0], sh), lerp(lLo[0], lHi[0], hv), la);
+    let g = lerp(lerp(oD[1], oS[1], sh), lerp(lLo[1], lHi[1], hv), la);
+    let b = lerp(lerp(oD[2], oS[2], sh), lerp(lLo[2], lHi[2], hv), la);
+    if (useIce) {
+      const ia = ice * sstep(0.70, 0.86, absLat[p] + (rk - 0.5) * 0.14);
+      if (ia > 0) { r = lerp(r, 238, ia); g = lerp(g, 244, ia); b = lerp(b, 250, ia); }
+    }
+    let L = lit[p] * gain; if (L > 1.4) L = 1.4;
+    const shade = 0.035 + 0.965 * L;
+    r *= shade; g *= shade; b *= shade;
+    const sv = spec[p] * (1 - la) * 90;
+    r += sv; g += sv; b += sv;
+
+    let er = 0, eg = 0, eb = 0;
+    if (useHeat) {
+      if (heat > 0.001) {
+        const lava = sstep(lavaX0, lavaX0 + 0.2, crack[ti]);
+        er = lava * lerp(220, 255, heat);
+        eg = lava * lerp(40, 200, heat * heat);
+        eb = lava * lerp(10, 100, heat * heat * heat);
+      }
+      er += dull * 200; eg += dull * 40; eb += dull * 12;
+    }
+
+    const c0 = pole > 0.001 ? ca0 + pole * sstep(0.62, 0.82, absLat[p]) * 0.95 : ca0;
+    const ca = sstep(c0 - soft, c0 + soft, cloud[ci]) * cOp;
+    if (ca > 0.003) {
+      const cs = 0.06 + 0.94 * (L > 1.25 ? 1.25 : L);
+      r = lerp(r, cc[0] * cs, ca); g = lerp(g, cc[1] * cs, ca); b = lerp(b, cc[2] * cs, ca);
+      const k = 1 - ca * 0.85; er *= k; eg *= k; eb *= k;
+    }
+    r += er; g += eg; b += eb;
+
+    const rm = rim[p] * litSoft[p] * atmo * 0.95;
+    r += rc[0] * rm; g += rc[1] * rm; b += rc[2] * rm;
+
+    out[o] = r; out[o + 1] = g; out[o + 2] = b; out[o + 3] = edgeA[p];
+  }
+  ectx.putImageData(img, 0, 0);
+}
+
+/* ================= 地球パネルの描画 ================= */
+function drawEarthPanel(time, d, st, intro) {
+  const { ctx, S } = EAR;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  paintBG(ctx, S);
+  ctx.globalAlpha = 1 - 0.6 * ramp(d, 0.9, 0.45);
+  ctx.drawImage(EAR.stars, 0, 0);
+  ctx.globalAlpha = 1;
+
+  // 左から差す太陽の光(太陽そのものは映さない)
+  const near = tFor(d);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  let g = ctx.createRadialGradient(-0.35 * S, 0.6 * S, 0, -0.35 * S, 0.6 * S, 1.2 * S);
+  g.addColorStop(0, `rgba(255,170,80,${(0.12 + 0.34 * near).toFixed(3)})`);
+  g.addColorStop(1, 'rgba(255,110,30,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, S, S);
+  ctx.restore();
+
+  // タイトル画面のあいだだけ、地球を少し大きく下げて置く
+  const ex = EX * S, ey = lerp(EY, 0.575, intro) * S, R = lerp(ER, 0.19, intro) * S, rc = st.rimC;
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  g = ctx.createRadialGradient(ex, ey, R * 0.96, ex, ey, R * 1.4);
+  const ha = (0.34 * st.atmo).toFixed(3);
+  g.addColorStop(0, `rgba(${rc[0] | 0},${rc[1] | 0},${rc[2] | 0},${ha})`);
+  g.addColorStop(1, `rgba(${rc[0] | 0},${rc[1] | 0},${rc[2] | 0},0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(ex, ey, R * 1.4, 0, TAU); ctx.fill();
+  ctx.restore();
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(ec, ex - R, ey - R, R * 2, R * 2);
+
+  if (st.heat > 0.01) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    g = ctx.createRadialGradient(ex - R * 0.2, ey, R * 0.6, ex - R * 0.2, ey, R * 1.6);
+    g.addColorStop(0, `rgba(255,120,40,${(0.30 * st.heat).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(255,90,20,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(ex - R * 0.2, ey, R * 1.6, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+/* ================= 軌道図パネルの描画 (文字なし) ================= */
+function drawRing(time, t, glow, hintAmt, accent) {
+  const { ctx, S } = ORB;
+  const c = S / 2, r1 = 0.497 * S;
+  ctx.save();
+
+  // 目盛り: 指と同じ量だけ回る
+  const rot = t * TAU * TURNS;
+  for (let i = 0; i < 120; i++) {
+    const a = -Math.PI / 2 + (i * TAU) / 120 + rot;
+    const major = i % 10 === 0;
+    const len = (major ? 0.026 : 0.012) * S;
+    const ro = r1 - 0.004 * S, ri = ro - len;
+    ctx.strokeStyle = major ? `rgba(255,255,255,${(0.60 + glow * 0.30).toFixed(3)})` : `rgba(255,255,255,${(0.24 + glow * 0.20).toFixed(3)})`;
+    ctx.lineWidth = (major ? 0.003 : 0.002) * S;
+    ctx.beginPath();
+    ctx.moveTo(c + Math.cos(a) * ro, c + Math.sin(a) * ro);
+    ctx.lineTo(c + Math.cos(a) * ri, c + Math.sin(a) * ri);
+    ctx.stroke();
+  }
+
+  // 進み具合: 円を TURNS 個に区切り、1周回すごとに1区間が満ちる
+  const rt = 0.43 * S, segA = TAU / TURNS, gap = 0.05;
+  let sty = accent;
+  if (ctx.createConicGradient) {
+    sty = ctx.createConicGradient(-Math.PI / 2, c, c);
+    sty.addColorStop(0, '#9bdcff'); sty.addColorStop(0.25, '#ffe08c');
+    sty.addColorStop(0.6, '#ffaa78'); sty.addColorStop(1, '#ff7f8a');
+  }
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 0.014 * S;
+  for (let i = 0; i < TURNS; i++) {
+    const a0 = -Math.PI / 2 + i * segA + gap / 2, a1 = -Math.PI / 2 + (i + 1) * segA - gap / 2;
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.beginPath(); ctx.arc(c, c, rt, a0, a1); ctx.stroke();
+    const fr = clamp(t * TURNS - i, 0, 1);
+    if (fr > 0.001) {
+      ctx.strokeStyle = sty;
+      ctx.beginPath(); ctx.arc(c, c, rt, a0, a0 + (a1 - a0) * fr); ctx.stroke();
+    }
+  }
+  ctx.lineCap = 'butt';
+
+  // 目印 (金星の軌道と、ゴールの水星の軌道)
+  [[VENUS, 'rgba(255,225,170,0.9)'], [MERC, 'rgba(255,150,80,1)']].forEach(([d, col]) => {
+    const a = -Math.PI / 2 + tFor(d) * TAU;
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 0.004 * S;
+    ctx.beginPath();
+    ctx.moveTo(c + Math.cos(a) * 0.404 * S, c + Math.sin(a) * 0.404 * S);
+    ctx.lineTo(c + Math.cos(a) * 0.419 * S, c + Math.sin(a) * 0.419 * S);
+    ctx.stroke();
+  });
+
+  // いまの位置
+  const ka = -Math.PI / 2 + t * TAU;
+  const kx = c + Math.cos(ka) * rt, ky = c + Math.sin(ka) * rt;
+  const kr = (0.034 + glow * 0.012) * S;
+  const g = ctx.createRadialGradient(kx, ky, 0, kx, ky, kr);
+  g.addColorStop(0, 'rgba(255,255,255,0.85)');
+  g.addColorStop(0.35, 'rgba(255,230,190,0.30)');
+  g.addColorStop(1, 'rgba(255,200,140,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(kx, ky, kr, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath(); ctx.arc(kx, ky, 0.0085 * S, 0, TAU); ctx.fill();
+
+  // 回す向きを示すシェブロン
+  if (hintAmt > 0.01) {
+    const rr = 0.46 * S, s = 0.011 * S;
+    ctx.lineWidth = 0.0045 * S; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    const phase = REDUCED ? 0.5 : (time * 0.35) % 1;
+    for (let k = 0; k < 3; k++) {
+      const a = 0.3 + phase * 0.7 + (k * TAU) / 3;
+      const px = c + Math.cos(a) * rr, py = c + Math.sin(a) * rr;
+      const tx = -Math.sin(a), ty = Math.cos(a), nx = Math.cos(a), ny = Math.sin(a);
+      ctx.strokeStyle = `rgba(255,255,255,${(hintAmt * Math.sin(phase * Math.PI) * 0.9).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(px - tx * s + nx * s, py - ty * s + ny * s);
+      ctx.lineTo(px + tx * s, py + ty * s);
+      ctx.lineTo(px - tx * s - nx * s, py - ty * s - ny * s);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+const ang = { e: 0, m: 1.3, v: 3.4 };   // 地球・水星・金星が軌道上のどこにいるか
+function drawOrbitPanel(time, d, t, glow, hintAmt, accent) {
+  const { ctx, S } = ORB;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.globalAlpha = 1;
+  paintBG(ctx, S);
+  ctx.globalAlpha = 0.85;
+  ctx.drawImage(ORB.stars, 0, 0);
+  ctx.globalAlpha = 1;
+
+  const c = S / 2;
+  const rE = rOrbit(d) * S, rE1 = rOrbit(1) * S, rM = rOrbit(MERC) * S, rV = rOrbit(VENUS) * S;
+  const rEdge = R_EDGE * S, rIn = 0.03 * S;
+  const nearM = 1 - clamp((d - MERC) / 0.08, 0, 1);
+  const life = lifeInfo(d);
+
+  // 暑さ: 太陽に近いほど赤く、遠いほど淡く
+  const f = (r) => clamp((r - rIn) / (rEdge - rIn), 0, 1);
+  let g = ctx.createRadialGradient(c, c, rIn, c, c, rEdge);
+  g.addColorStop(0, 'rgba(255,70,20,0.50)');
+  g.addColorStop(f(rM), 'rgba(255,100,30,0.30)');
+  g.addColorStop(f(rV), 'rgba(255,175,70,0.12)');
+  g.addColorStop(f(rE1), 'rgba(255,225,140,0.04)');
+  g.addColorStop(1, 'rgba(255,225,140,0.02)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c, c, rEdge, 0, TAU); ctx.fill();
+
+  // 軌道の線 (すべて画面と同心)
+  ctx.setLineDash([0.008 * S, 0.008 * S]);
+  ctx.lineWidth = 0.0024 * S;
+  ctx.strokeStyle = 'rgba(180,205,255,0.45)';
+  ctx.beginPath(); ctx.arc(c, c, rE1, 0, TAU); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle = 'rgba(255,225,170,0.42)';
+  ctx.beginPath(); ctx.arc(c, c, rV, 0, TAU); ctx.stroke();
+  if (nearM > 0.01) {
+    ctx.lineWidth = 0.024 * S;
+    ctx.strokeStyle = `rgba(255,120,40,${(0.22 * nearM).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(c, c, rM, 0, TAU); ctx.stroke();
+  }
+  ctx.lineWidth = (0.004 + 0.004 * nearM) * S;
+  ctx.strokeStyle = `rgba(255,150,80,${(0.65 + 0.35 * nearM).toFixed(2)})`;
+  ctx.beginPath(); ctx.arc(c, c, rM, 0, TAU); ctx.stroke();
+  ctx.lineWidth = 0.003 * S;
+  ctx.strokeStyle = accent;
+  ctx.beginPath(); ctx.arc(c, c, rE, 0, TAU); ctx.stroke();
+
+  // 水星・金星
+  ctx.fillStyle = '#c9c2b8';
+  ctx.beginPath(); ctx.arc(c + Math.cos(ang.m) * rM, c + Math.sin(ang.m) * rM, 0.009 * S, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#f0d8a0';
+  ctx.beginPath(); ctx.arc(c + Math.cos(ang.v) * rV, c + Math.sin(ang.v) * rV, 0.0125 * S, 0, TAU); ctx.fill();
+
+  // 太陽
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  g = ctx.createRadialGradient(c, c, 0.02 * S, c, c, 0.14 * S);
+  g.addColorStop(0, 'rgba(255,176,70,0.55)');
+  g.addColorStop(0.3, 'rgba(255,130,40,0.20)');
+  g.addColorStop(1, 'rgba(255,90,20,0)');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c, c, 0.14 * S, 0, TAU); ctx.fill();
+  ctx.restore();
+  g = ctx.createRadialGradient(c, c, 0, c, c, 0.035 * S);
+  g.addColorStop(0, '#fffdf0'); g.addColorStop(0.6, '#fff0b8'); g.addColorStop(1, '#ffb43c');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(c, c, 0.035 * S, 0, TAU); ctx.fill();
+
+  // いまの地球: 緑の光が生命の可能性、赤い光が熱
+  const ex = c + Math.cos(ang.e) * rE, ey = c + Math.sin(ang.e) * rE;
+  const dc = dotRGB(d);
+  const hot = ramp(d, 0.8, 0.45);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  if (life.L > 0.02) {
+    g = ctx.createRadialGradient(ex, ey, 0.01 * S, ex, ey, 0.07 * S);
+    g.addColorStop(0, `rgba(110,235,160,${(0.6 * life.L).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(110,235,160,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(ex, ey, 0.07 * S, 0, TAU); ctx.fill();
+  }
+  if (hot > 0.02) {
+    g = ctx.createRadialGradient(ex, ey, 0.008 * S, ex, ey, 0.055 * S);
+    g.addColorStop(0, `rgba(255,100,30,${(0.55 * hot).toFixed(3)})`);
+    g.addColorStop(1, 'rgba(255,100,30,0)');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(ex, ey, 0.055 * S, 0, TAU); ctx.fill();
+  }
+  ctx.restore();
+  ctx.fillStyle = rgbStr(dc);
+  ctx.beginPath(); ctx.arc(ex, ey, 0.0165 * S, 0, TAU); ctx.fill();
+  ctx.lineWidth = 0.0025 * S;
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.stroke();
+
+  drawRing(time, t, glow, hintAmt, accent);
+}
+
+/* ================= 表示の更新 ================= */
+const valYear = document.getElementById('val-year');
+const valTemp = document.getElementById('val-temp');
+const valMax = document.getElementById('val-max');
+const valMin = document.getElementById('val-min');
+const valLife = document.getElementById('val-life');
+const readoutsEl = document.getElementById('readouts');
+
+// 見出しと本文を入れ替える。切り替わりのときだけ短く消える。
+function makeSwapper(topEl, titleEl, descEl) {
+  let key = null, timer = 0;
+  let latest = { title: '', desc: '' };
+  const apply = () => {
+    titleEl.textContent = latest.title; descEl.innerHTML = latest.desc;
+    topEl.classList.remove('swap');
+  };
+  return (k, title, desc) => {
+    latest = { title, desc };
+    if (k === key) return;
+    const first = key === null;
+    key = k;
+    if (first) { apply(); return; }
+    topEl.classList.add('swap');
+    clearTimeout(timer);
+    timer = setTimeout(apply, 220);
+  };
+}
+const swapEarth = makeSwapper(document.getElementById('e-top'), document.getElementById('e-title'), document.getElementById('e-desc'));
+
+// 数字だけ大きく見せるため、前の文字・数字・単位を別々の要素にして入れる
+function setVal(el, pre, num, post) {
+  el.innerHTML = (pre ? '<span>' + pre + '</span>' : '') + '<span class="num">' + num + '</span>' + (post ? '<span>' + post + '</span>' : '');
+}
+// 地球の右がわの「〇〇が溶ける」。変わるときだけ、ふわっと入れ替える
+const meltEl = document.getElementById('melt');
+const meltIcon = document.getElementById('melt-icon');
+const meltName = document.getElementById('melt-name');
+const meltTemp = document.getElementById('melt-temp');
+let meltIdx = -2, meltTimer = 0;
+function setMelt(idx) {
+  if (idx === meltIdx) return;
+  const first = meltIdx === -2;
+  meltIdx = idx;
+  const apply = () => {
+    if (idx < 0) { meltEl.classList.add('hide'); return; }
+    const m = MELT[idx];
+    meltIcon.innerHTML = ICONS[m.icon];
+    meltIcon.style.color = m.col;
+    meltName.textContent = m.name;
+    meltTemp.innerHTML = '約<span class="n">' + m.at + '</span>℃から';
+    meltEl.classList.remove('hide');
+  };
+  clearTimeout(meltTimer);
+  if (first) { apply(); return; }
+  meltEl.classList.add('hide');
+  meltTimer = setTimeout(apply, 260);
+}
+const cache = { year: '', temp: '', max: '', min: '', life: '', col: '', accent: '' };
+function updateUI(d, accent) {
+  const si = STAGES.findIndex((s) => d >= s.min);
+  swapEarth('s' + si, STAGES[si].title, STAGES[si].desc);
+
+  // 表(Universe Sandbox で測った値)を、距離ごとに直線でつないで表示する
+  const s = sample(d);
+  const year = String(Number(s.months.toFixed(1)));
+  const temp = String(Math.round(s.mean));
+  const maxStr = '<span>最高</span><span class="n">' + Math.round(s.max) + '</span><span>℃</span>';
+  const minStr = '<span>北極・南極</span><span class="n">' + Math.round(s.min) + '</span><span>℃</span>';
+  let mi = -1;
+  for (let i = 0; i < MELT.length; i++) if (s.max >= MELT[i].at) mi = i;   // いちばん暑い場所の温度で決める
+  setMelt(mi);
+  const life = lifeInfo(d);
+  const lifeNum = fmtPct(life.v);
+  if (year !== cache.year) { setVal(valYear, '', year, 'ヶ月'); cache.year = year; }
+  if (temp !== cache.temp) { setVal(valTemp, '', temp, '℃'); cache.temp = temp; }
+  if (maxStr !== cache.max) { valMax.innerHTML = maxStr; cache.max = maxStr; }
+  if (minStr !== cache.min) { valMin.innerHTML = minStr; cache.min = minStr; }
+  if (lifeNum !== cache.life) {
+    setVal(valLife, '', lifeNum, '%');
+    readoutsEl.style.setProperty('--life-w', clamp(life.v, 0, 100).toFixed(1) + '%');
+    cache.life = lifeNum;
+  }
+  if (life.col !== cache.col) { readoutsEl.style.setProperty('--life-c', life.col); cache.col = life.col; }
+  if (accent !== cache.accent) { wall.style.setProperty('--accent', accent); cache.accent = accent; }
+}
+
+/* ================= 入力: 軌道図のふちをなぞる ================= */
+let t = 0;                 // 0 (1 AU) .. 1 (水星の軌道)
+let vel = 0;               // t の速さ (1/秒)
+let dragging = false, pid = null, lastAng = 0, lastMoveTs = 0;
+let lastInput = performance.now();
+let glow = 0, hintAmt = 0;
+let started = false;       // 「はじめる」を押すまではタイトル画面
+let introAmt = 1;          // タイトル画面の度合い (1 = タイトル画面, 0 = 通常)
+const startBtn = document.getElementById('start');
+
+function setStarted(v) {
+  started = v;
+  wall.classList.toggle('intro', !v);
+}
+startBtn.addEventListener('click', () => { setStarted(true); touched(); });
+function touched() { lastInput = performance.now(); }
+function pointerPolar(e) {
+  const r = ORB.el.getBoundingClientRect();
+  const dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+  return { ang: Math.atan2(dy, dx), rr: Math.hypot(dx, dy) / (r.width / 2) };
+}
+ORB.el.addEventListener('pointerdown', (e) => {
+  if (dragging || !started) return;
+  if (e.pointerType === 'mouse' && e.button !== 0) return;
+  const p = pointerPolar(e);
+  if (p.rr < 0.74 || p.rr > 1.0) return;       // ふちの帯だけ反応する
+  dragging = true; pid = e.pointerId; lastAng = p.ang; lastMoveTs = e.timeStamp; vel = 0;
+  try { ORB.el.setPointerCapture(pid); } catch (_) {}
+  ORB.el.classList.add('grabbing');
+  touched();
+});
+ORB.el.addEventListener('pointermove', (e) => {
+  if (!dragging || e.pointerId !== pid) return;
+  const p = pointerPolar(e);
+  let da = p.ang - lastAng;
+  if (da > Math.PI) da -= TAU; else if (da < -Math.PI) da += TAU;
+  lastAng = p.ang;
+  const dT = da / (TAU * TURNS);
+  const dtSec = Math.max(0.001, (e.timeStamp - lastMoveTs) / 1000);
+  lastMoveTs = e.timeStamp;
+  t = clamp(t + dT, 0, 1);
+  vel = vel * 0.55 + (dT / dtSec) * 0.45;
+  touched();
+});
+function endDrag(e) {
+  if (!dragging || e.pointerId !== pid) return;
+  dragging = false;
+  try { ORB.el.releasePointerCapture(pid); } catch (_) {}
+  pid = null;
+  ORB.el.classList.remove('grabbing');
+  if (e.timeStamp - lastMoveTs > 90) vel = 0;
+  touched();
+}
+ORB.el.addEventListener('pointerup', endDrag);
+ORB.el.addEventListener('pointercancel', endDrag);
+ORB.el.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!started) return;
+  t = clamp(t + e.deltaY * 0.0004, 0, 1); vel = 0; touched();
+}, { passive: false });
+window.addEventListener('keydown', (e) => {
+  if (!started) return;
+  const k = e.key;
+  if (k === 'ArrowRight' || k === 'ArrowUp' || k === '+') t = clamp(t + 0.01, 0, 1);
+  else if (k === 'ArrowLeft' || k === 'ArrowDown' || k === '-') t = clamp(t - 0.01, 0, 1);
+  else if (k === 'Home') t = 0;
+  else if (k === 'End') t = 1;
+  else return;
+  e.preventDefault(); vel = 0; touched();
+});
+['contextmenu', 'gesturestart', 'dragstart'].forEach((n) => wall.addEventListener(n, (e) => e.preventDefault()));
+
+/* ================= メインループ ================= */
+let last = performance.now(), lastEarth = -1e9, spinTex = 0, cloudTex = 0;
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+  last = now;
+
+  if (!dragging) {
+    if (Math.abs(vel) > 0.004) {
+      t = clamp(t + vel * dt, 0, 1);
+      vel *= Math.exp(-2.6 * dt);
+      if (t <= 0 || t >= 1) vel = 0;
+    } else vel = 0;
+  }
+  const idle = (now - lastInput) / 1000;
+  // 誰も触れないと、1 AU までゆっくり戻って、タイトル画面にもどる
+  if (started && !dragging && idle > IDLE_RESET_SEC) {
+    if (t > 0) t = Math.max(0, t - dt * 0.05);
+    else setStarted(false);
+  }
+
+  glow += ((dragging ? 1 : 0) - glow) * Math.min(1, dt * 8);
+  const wantHint = !dragging && (!started || (idle > 6 && t < 0.03));
+  hintAmt += ((wantHint ? 1 : 0) - hintAmt) * Math.min(1, dt * 3);
+  introAmt += ((started ? 0 : 1) - introAmt) * Math.min(1, dt * 3.5);
+
+  const d = dFor(t);
+  if (!REDUCED) {
+    spinTex = (spinTex + (dt * SPIN_SPEED / TAU) * TW) % TW;
+    cloudTex = (cloudTex + (dt * SPIN_SPEED * 1.12 / TAU) * TW) % TW;
+    // 公転の速さはケプラーの第3法則 (周期 ∝ d^1.5) にあわせる
+    ang.e = (ang.e + dt * ORBIT_SPEED * Math.pow(d, -1.5)) % TAU;
+    ang.m = (ang.m + dt * ORBIT_SPEED * Math.pow(MERC, -1.5)) % TAU;
+    ang.v = (ang.v + dt * ORBIT_SPEED * Math.pow(VENUS, -1.5)) % TAU;
+  }
+  const st = earthState(d);
+  const accent = rgbStr(accentRGB(d));
+
+  if (now - lastEarth > 30) {
+    renderEarth(st, spinTex, cloudTex);
+    lastEarth = now;
+  }
+  updateUI(d, accent);
+  drawEarthPanel(now / 1000, d, st, introAmt);
+  drawOrbitPanel(now / 1000, d, t, glow, hintAmt, accent);
+}
+requestAnimationFrame(frame);
+})();
+</script>
